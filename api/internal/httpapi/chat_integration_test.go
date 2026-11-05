@@ -160,7 +160,7 @@ func TestChatAccessAndDelivery(t *testing.T) {
 	older := request(0, "GET", path+"?limit=1&before="+cursor, "", 200)
 	_ = json.Unmarshal(older["messages"], &messages)
 	if len(messages) != 1 || messages[0].ID != firstMessage.ID || string(older["next_cursor"]) != `""` {
-		t.Fatal("incorrect second page")
+		t.Fatalf("incorrect second page: first=%s cursor=%s older=%s", firstMessage.ID, cursor, older["messages"])
 	}
 	request(0, "GET", path+"?before=-1", "", 400)
 	request(0, "GET", path+"?limit=101", "", 400)

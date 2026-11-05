@@ -27,6 +27,11 @@ services:
       PUSHER_KEY: ${PUSHER_KEY:-}
       PUSHER_SECRET: ${PUSHER_SECRET:-}
       PUSHER_CLUSTER: ${PUSHER_CLUSTER:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
+      GMAIL_SENDER: ${GMAIL_SENDER:-}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:-}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:9090}
       DATABASE_URL: postgres://chat:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/chat?sslmode=disable

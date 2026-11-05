@@ -81,6 +81,19 @@ func (h *chatHandlers) createConversation(w http.ResponseWriter, r *http.Request
 	writeJSON(w, 200, map[string]any{"conversation": c})
 }
 
+func (h *chatHandlers) savedConversation(w http.ResponseWriter, r *http.Request, user auth.User) {
+	var input struct{}
+	if !readAuthJSON(w, r, &input) {
+		return
+	}
+	c, err := h.store.CreateConversation(r.Context(), user.ID, user.ID)
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"conversation": c})
+}
+
 func (h *chatHandlers) listConversations(w http.ResponseWriter, r *http.Request, user auth.User) {
 	before, limit, ok := pagination(w, r)
 	if !ok {

@@ -99,6 +99,9 @@ func (s *Store) Create(ctx context.Context, convID, userID, clientID string) (Ca
 		return Call{}, false, err
 	}
 	// Lock participants in a deterministic order to serialize competing calls.
+	if peer == userID {
+		return Call{}, false, ErrState
+	}
 	rows, err := tx.Query(ctx, "SELECT id FROM users WHERE id IN ($1,$2) ORDER BY id FOR UPDATE", userID, peer)
 	if err != nil {
 		return Call{}, false, err

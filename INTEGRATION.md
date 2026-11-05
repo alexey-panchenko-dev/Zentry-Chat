@@ -1,5 +1,7 @@
 # Zently visual layer for Zentry-Chat
 
+**Historical baseline:** the visual-only preservation statements below describe the initial integration. Subsequent user-authorized account tools and audio fixes are documented in ACCOUNT-TOOLS.md and supersede those scope statements.
+
 Base: alexey-panchenko-dev/Zentry-Chat at e6f6fe5d32a3820803e7797b9f91364c62c32526.
 
 ## Scope

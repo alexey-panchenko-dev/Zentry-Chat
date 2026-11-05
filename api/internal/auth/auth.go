@@ -57,9 +57,15 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (U
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (User, string, time.Time, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return User{}, "", time.Time{}, err
+	}
+	defer tx.Rollback(context.Background())
 	var u User
 	var hash string
-	err := s.db.QueryRow(ctx, `SELECT id::text,name,email,created_at,password_hash FROM users WHERE email=$1`, email).
+	// Serialize password verification/session creation with password reset.
+	err = tx.QueryRow(ctx, `SELECT id::text,name,email,created_at,password_hash FROM users WHERE email=$1 FOR UPDATE`, email).
 		Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &hash)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(password))
@@ -78,7 +84,10 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 	token := hex.EncodeToString(bytes[:])
 	digest := sha256.Sum256([]byte(token))
 	expires := time.Now().UTC().Add(SessionTTL)
-	_, err = s.db.Exec(ctx, `INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)`, u.ID, digest[:], expires)
+	_, err = tx.Exec(ctx, `INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)`, u.ID, digest[:], expires)
+	if err == nil {
+		err = tx.Commit(ctx)
+	}
 	return u, token, expires, err
 }
 

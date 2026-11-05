@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Volume2, VolumeX, RotateCw } from 'lucide-react'
 
 export function RemoteAudio({ stream }: { stream: MediaStream | null }) {
   const ref = useRef<HTMLAudioElement>(null)
@@ -78,12 +79,11 @@ export function RemoteAudio({ stream }: { stream: MediaStream | null }) {
     }
   }, [stream])
 
-  return <div className="space-y-2 bg-slate-900 p-3">
-    <audio ref={ref} autoPlay controls className="w-full" aria-label="Звук собеседника" />
-    <button type="button" className="secondary w-full" onClick={enable}>
-      {playing ? 'Звук включён — включить повторно' : 'Включить звук'}
-    </button>
-    <p className="text-xs text-slate-400" role="status">{status}</p>
-    {error && <p className="text-xs text-amber-300" role="alert">{error}</p>}
+  return <div className="z-audio-control">
+    <audio ref={ref} autoPlay aria-label="Звук собеседника" />
+    <div className="z-audio-heading"><span className={'z-audio-symbol'+(playing?' is-playing':'')}>{playing?<Volume2 size={20}/>:<VolumeX size={20}/>}</span><div><strong>Звук собеседника</strong><span>{playing?'Воспроизведение включено':'Звук не воспроизводится'}</span></div></div>
+    <button type="button" className="secondary z-audio-retry" onClick={enable}><RotateCw size={14}/>{playing?'Перезапустить звук':'Включить звук'}</button>
+    <details className="z-audio-details"><summary>Если собеседника не слышно</summary><p role="status">{status}</p><p>Проверь громкость устройства и выбранный микрофон у собеседника. Работа плеера ещё не подтверждает передачу голоса.</p></details>
+    {error && <p className="notice" role="alert">Браузер не разрешил воспроизведение. Нажми «Включить звук» ещё раз.</p>}
   </div>
 }

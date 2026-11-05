@@ -118,3 +118,20 @@ test('Remote browser stream retains both audio and video tracks', async () => {
   await client.finish()
   client.dispose()
 })
+
+test('Separate browser stream associations never replace received audio with video', async () => {
+  reset()
+  navigator.mediaDevices.getUserMedia = async () => new Stream(tracks())
+  const client = new CallController('me', () => {})
+  await client.start('dialog')
+  current = { ...current, status: 'accepted', version: 2 }
+  await client.sync()
+  const [audio, video] = tracks()
+  audio.id = 'remote-audio'; video.id = 'remote-video'
+  const peer = Peer.instances[0]
+  peer.ontrack({ track: audio, streams: [new Stream([audio])] })
+  peer.ontrack({ track: video, streams: [new Stream([video])] })
+  assert.deepEqual(client.view.remote.getTracks().map(t => t.kind), ['audio', 'video'])
+  await client.finish()
+  client.dispose()
+})
