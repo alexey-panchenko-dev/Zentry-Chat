@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Chat API",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Регистрация, вход и серверные сессии. Сначала выполните register, затем login. Браузер сохранит HttpOnly-cookie автоматически; после этого можно вызывать me и logout. Вводить токен вручную не нужно."
   },
   "servers": [
@@ -25,6 +25,12 @@
     },
     {
       "name": "Calls"
+    },
+    {
+      "name": "Profile"
+    },
+    {
+      "name": "Discovery"
     }
   ],
   "paths": {
@@ -973,7 +979,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "JSON-запрос из channelAuthorization.customHandler. Разрешены private-conversation-<id> участнику переписки и private-user-<свой id> для входящих звонков.",
+        "description": "JSON из channelAuthorization.customHandler. private-conversation-<id> доступен участнику, private-user-<свой id> — только владельцу. Личные события: conversation.updated {conversation_id} после создания диалога/совпадения, conversation.message {conversation_id} после текста/голоса, discovery.updated {}, conversation.read {conversation_id,user_id,last_read_id}. После подписки/переподключения синхронизируйте состояние через HTTP. Публикация после фиксации в PostgreSQL, без гарантированной очереди повторов.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1885,6 +1891,358 @@
           }
         }
       }
+    },
+    "/api/profile": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Текущий профиль",
+        "description": "",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Редактировать профиль",
+        "description": "Возраст и описание могут быть незаполнены: это закрывает только знакомства. Описание до 100 Unicode-символов. Город необязателен, до 100 символов. Возраст — неотрицательное целое int32, без отдельного возрастного диапазона.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/discovery": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Кандидаты для знакомства",
+        "description": "До 30 заполненных профилей. Исключены свой профиль, совпадения, уже отправленные лайки и отклонённые менее 7 дней назад. После голосования запросите следующую карточку.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        }
+      }
+    },
+    "/api/discovery/likes": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Входящие лайки",
+        "description": "До 30 входящих лайков без своего ответа и совпадений. Полные данные карточки включены в ответ.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        }
+      }
+    },
+    "/api/discovery/votes": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Поставить лайк или отклонить",
+        "description": "Требуется заполненный профиль у обоих. Взаимные лайки атомарно создают одно совпадение и одно системное сообщение в существующем или новом диалоге. Повторные и одновременные запросы не создают дубликатов. После сохранения публикуются discovery.updated и при совпадении conversation.updated в личные каналы обоих.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiscoveryVote"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unread": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "summary": "Количество непрочитанных чатов",
+        "description": "Считаются переписки с непрочитанными чужими или системными сообщениями, включая не загруженные страницы списка. Собственные обычные сообщения не учитываются.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadChats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        }
+      }
+    },
+    "/api/conversations/{id}/read": {
+      "get": {
+        "tags": [
+          "Chat"
+        ],
+        "summary": "Состояние прочтения",
+        "description": "Только для участника. GET ничего не отмечает прочитанным.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Chat"
+        ],
+        "summary": "Подтвердить просмотр до сообщения",
+        "description": "Идентификатор должен принадлежать этой переписке. Курсор монотонный. Клиент подтверждает только реально показанное сообщение в видимой активной переписке. conversation.read с conversation_id, user_id, last_read_id отправляется обоим участникам, включая другие устройства читателя.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешно",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Требуется вход"
+          },
+          "403": {
+            "description": "Профиль не заполнен (profile_required) или запрещён Origin"
+          },
+          "404": {
+            "description": "Нет записи или доступа"
+          },
+          "400": {
+            "description": "Неверные данные"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2026,6 +2384,11 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Число непрочитанных чужих и системных сообщений"
           }
         },
         "required": [
@@ -2047,7 +2410,7 @@
           },
           "sender_id": {
             "type": "string",
-            "format": "uuid"
+            "description": "UUID отправителя; пустая строка у системного сообщения"
           },
           "client_message_id": {
             "type": "string",
@@ -2055,12 +2418,26 @@
           },
           "body": {
             "type": "string",
-            "minLength": 1,
             "maxLength": 1000
           },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "voice",
+              "system"
+            ],
+            "description": "Для старых текстовых сообщений может отсутствовать"
+          },
+          "audio_url": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": "integer"
           }
         },
         "required": [
@@ -2277,6 +2654,189 @@
           "payload"
         ],
         "additionalProperties": false
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "avatar_url": {
+            "type": "string"
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Целое число лет, без продуктового возрастного диапазона"
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "age",
+          "bio",
+          "city"
+        ]
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Целое число лет, без продуктового возрастного диапазона"
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ProfileEnvelope": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/Profile"
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "DiscoveryPage": {
+        "type": "object",
+        "properties": {
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Profile"
+            },
+            "maxItems": 30
+          }
+        },
+        "required": [
+          "profiles"
+        ]
+      },
+      "DiscoveryVote": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "liked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "liked"
+        ]
+      },
+      "DiscoveryResult": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "boolean"
+          },
+          "conversation_id": {
+            "type": "string",
+            "description": "UUID диалога при совпадении, иначе пустая строка"
+          }
+        },
+        "required": [
+          "matched",
+          "conversation_id"
+        ]
+      },
+      "ReadState": {
+        "type": "object",
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "peer_last_read_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "unread_count",
+          "last_message_id",
+          "peer_last_read_id"
+        ]
+      },
+      "ReadInput": {
+        "type": "object",
+        "properties": {
+          "last_message_id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          }
+        },
+        "required": [
+          "last_message_id"
+        ]
+      },
+      "ReadResult": {
+        "type": "object",
+        "properties": {
+          "last_read_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "last_read_id"
+        ]
+      },
+      "UnreadChats": {
+        "type": "object",
+        "properties": {
+          "unread_chats": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "unread_chats"
+        ]
       }
     },
     "responses": {

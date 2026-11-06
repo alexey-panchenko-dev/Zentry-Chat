@@ -21,6 +21,14 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	}
 	ch := &chatHandlers{store: chat.New(db), auth: h.service, publisher: publisher}
 	chatMux := http.NewServeMux()
+	chatMux.HandleFunc("GET /api/profile", ch.signedIn(ch.getProfile))
+	chatMux.HandleFunc("PUT /api/profile", ch.signedIn(ch.updateProfile))
+	chatMux.HandleFunc("GET /api/discovery", ch.signedIn(ch.discovery))
+	chatMux.HandleFunc("GET /api/discovery/likes", ch.signedIn(ch.discovery))
+	chatMux.HandleFunc("POST /api/discovery/votes", ch.signedIn(ch.vote))
+	chatMux.HandleFunc("GET /api/unread", ch.signedIn(ch.unread))
+	chatMux.HandleFunc("GET /api/conversations/{id}/read", ch.signedIn(ch.readState))
+	chatMux.HandleFunc("POST /api/conversations/{id}/read", ch.signedIn(ch.markRead))
 	chatMux.HandleFunc("POST /api/conversations/{id}/voice", ch.signedIn(ch.sendVoice))
 	chatMux.HandleFunc("GET /api/messages/{messageID}/audio", ch.signedIn(ch.audio))
 	chatMux.HandleFunc("POST /api/profile/photo", ch.signedIn(ch.setPhoto))
@@ -41,7 +49,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
 	protectedChat := protectAPI(chatMux, 120)
-	for _, pattern := range []string{"/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()

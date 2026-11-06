@@ -12,13 +12,21 @@ func (s *Store) SendVoice(ctx context.Context, c, u, id, mime string, data []byt
 	if err := s.CheckMember(ctx, c, u); err != nil {
 		return Message{}, false, err
 	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return Message{}, false, err
+	}
+	defer tx.Rollback(context.Background())
+	if _, err = tx.Exec(ctx, "SELECT id FROM conversations WHERE id=$1 FOR UPDATE", c); err != nil {
+		return Message{}, false, err
+	}
 	var m Message
-	err := s.db.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body,kind,audio,audio_mime,duration_ms) VALUES($1,$2,$3,'','voice',$4,$5,$6) ON CONFLICT(sender_id,client_message_id) DO NOTHING RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind,duration_ms`, c, u, id, data, mime, duration).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS)
+	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body,kind,audio,audio_mime,duration_ms) VALUES($1,$2,$3,'','voice',$4,$5,$6) ON CONFLICT(sender_id,client_message_id) DO NOTHING RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind,duration_ms`, c, u, id, data, mime, duration).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS)
 	created := err == nil
 	if errors.Is(err, pgx.ErrNoRows) {
 		var original []byte
 		var originalMime string
-		err = s.db.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind,COALESCE(duration_ms,0),COALESCE(audio,''::bytea),COALESCE(audio_mime,'') FROM messages WHERE sender_id=$1 AND client_message_id=$2`, u, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS, &original, &originalMime)
+		err = tx.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind,COALESCE(duration_ms,0),COALESCE(audio,''::bytea),COALESCE(audio_mime,'') FROM messages WHERE sender_id=$1 AND client_message_id=$2`, u, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS, &original, &originalMime)
 		if err == nil && (m.Kind != "voice" || m.ConversationID != c || m.DurationMS != duration || originalMime != mime || !bytes.Equal(original, data)) {
 			return Message{}, false, ErrConflict
 		}
@@ -26,7 +34,10 @@ func (s *Store) SendVoice(ctx context.Context, c, u, id, mime string, data []byt
 	if err == nil {
 		m.AudioURL = fmt.Sprintf("/api/messages/%s/audio", m.ID)
 	}
-	return m, created, err
+	if err != nil {
+		return m, created, err
+	}
+	return m, created, tx.Commit(ctx)
 }
 func (s *Store) Audio(ctx context.Context, id, u string) ([]byte, string, error) {
 	var b []byte

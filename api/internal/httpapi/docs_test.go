@@ -37,6 +37,11 @@ func TestSwaggerRoutes(t *testing.T) {
 					t.Fatalf("undocumented call route: %s", path)
 				}
 			}
+			for _, path := range []string{"/api/profile", "/api/discovery", "/api/discovery/likes", "/api/discovery/votes", "/api/unread", "/api/conversations/{id}/read"} {
+				if _, ok := spec.Paths[path]; !ok {
+					t.Fatalf("undocumented discovery/read route: %s", path)
+				}
+			}
 		}
 	}
 	w := httptest.NewRecorder()

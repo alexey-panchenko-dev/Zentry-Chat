@@ -23,6 +23,7 @@ type Conversation struct {
 	Participant PublicUser `json:"participant"`
 	CreatedAt   time.Time  `json:"created_at"`
 	Position    string     `json:"-"`
+	UnreadCount int        `json:"unread_count"`
 }
 
 type Message struct {
@@ -93,7 +94,7 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'')
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>m.last_read_id AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
         WHERE m.user_id=$1 AND ($2::bigint=0 OR c.position<$2)
@@ -105,7 +106,7 @@ func (s *Store) Conversations(ctx context.Context, userID string, before int64, 
 	result := make([]Conversation, 0)
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.AvatarURL); err != nil {
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.AvatarURL, &c.UnreadCount); err != nil {
 			return nil, err
 		}
 		result = append(result, c)
@@ -129,7 +130,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,CASE WHEN kind='voice' THEN kind ELSE '' END,COALESCE(duration_ms,0)
+	rows, err := s.db.Query(ctx, `SELECT id::text,conversation_id::text,COALESCE(sender_id::text,''),client_message_id::text,body,created_at,CASE WHEN kind<>'text' THEN kind ELSE '' END,COALESCE(duration_ms,0)
         FROM messages WHERE conversation_id=$1 AND ($2::bigint=0 OR id<$2) ORDER BY id DESC LIMIT $3`, conversationID, before, limit)
 	if err != nil {
 		return nil, err
@@ -153,22 +154,33 @@ func (s *Store) Send(ctx context.Context, conversationID, userID, clientID, body
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return Message{}, false, err
 	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return Message{}, false, err
+	}
+	defer tx.Rollback(context.Background())
+	if _, err = tx.Exec(ctx, "SELECT id FROM conversations WHERE id=$1 FOR UPDATE", conversationID); err != nil {
+		return Message{}, false, err
+	}
 	var m Message
-	err := s.db.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body)
+	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body)
         VALUES($1,$2,$3,$4) ON CONFLICT(sender_id,client_message_id) DO NOTHING
         RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at`, conversationID, userID, clientID, body).
 		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
 	if err == nil {
-		return m, true, nil
+		return m, true, tx.Commit(ctx)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return m, false, err
 	}
-	err = s.db.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at
+	err = tx.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at
         FROM messages WHERE sender_id=$1 AND client_message_id=$2`, userID, clientID).
 		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
 	if err == nil && (m.ConversationID != conversationID || m.Body != body) {
 		return Message{}, false, ErrConflict
 	}
-	return m, false, err
+	if err != nil {
+		return m, false, err
+	}
+	return m, false, tx.Commit(ctx)
 }

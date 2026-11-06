@@ -1,4 +1,5 @@
 import { MediaAvailability } from '@/MediaAvailability'
+import { watchConversations } from '@/conversation-updates'
 import { createMediaQueryStore } from './media-query'
 import { VoiceComposer } from '@/VoiceComposer'
 import { VoiceMessage } from '@/VoiceMessage'
@@ -7,11 +8,13 @@ import { CallPanel } from '@/CallPanel'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import Pusher from 'pusher-js'
-import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Check, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { subscribeRealtime } from './realtime.ts'
+import { Discovery, ProfileEditor } from '@/Discovery'
+import { useReadReceipt } from './read-receipt.ts'
+import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Check, CheckCheck, Heart, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { Brand, Avatar } from '@/Visual'
 import { api, errorText } from '@/api'
-import type { Conversation, Message, MessagePage, User } from '@/api'
+import type { Conversation, Message, MessagePage, ReadState, User } from '@/api'
 
 export default function App() {
   const cache = useQueryClient()
@@ -96,7 +99,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
   const [searchError,setSearchError]=useState('')
-  const [uiSection, setUiSection] = useState<'chats'|'calls'|'settings'>('chats')
+  const [uiSection, setUiSection] = useState<'chats'|'calls'|'settings'|'discovery'>('chats')
   const [callActive,setCallActive]=useState(false)
   const [compact, setCompact] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -104,8 +107,26 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [mobileLayout] = useState(()=>createMediaQueryStore(window.matchMedia('(max-width: 720px)')))
   const isMobile = useSyncExternalStore(mobileLayout.subscribe,mobileLayout.getSnapshot)
   const [soundsEnabled,setSoundsEnabled] = useState(()=>localStorage.getItem('zently-call-sounds')!=='0')
+  const [realtimeReady, setRealtimeReady] = useState(false)
+  useEffect(() => watchConversations(user.id, event => {
+    if(event.reason==='discovery') {
+      void cache.invalidateQueries({queryKey:['discovery']})
+      return
+    }
+    void cache.invalidateQueries({ queryKey: ['conversations'] })
+    void cache.invalidateQueries({ queryKey: ['unread'] })
+    if(event.reason==='connected') {
+      void cache.invalidateQueries({queryKey:['discovery']})
+      void cache.invalidateQueries({queryKey:['messages']})
+      void cache.invalidateQueries({queryKey:['read-state']})
+    }
+    if(event.conversation_id && event.reason!=='message') void cache.invalidateQueries({queryKey:['read-state',event.conversation_id]})
+    if(event.conversation_id && event.reason==='conversation') void cache.invalidateQueries({queryKey:['messages',event.conversation_id]})
+  }, setRealtimeReady), [cache, user.id])
+  const unread = useQuery({queryKey:['unread'], queryFn:async()=>(await api.get<{unread_chats:number}>('/unread')).data, refetchInterval:realtimeReady?false:60_000})
   const dialogs = useInfiniteQuery({
     queryKey: ['conversations'], initialPageParam: '',
+    refetchInterval: realtimeReady ? false : 60_000,
     queryFn: async ({ pageParam }) => (await api.get<{ conversations: Conversation[]; next_cursor: string }>('/conversations', { params: { limit: 30, before: pageParam || undefined } })).data,
     getNextPageParam: (page) => page.next_cursor || undefined,
   })
@@ -125,7 +146,8 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   return <div data-ui-section={uiSection} className={'z-shell'+(compact?' is-compact':'')+(mobileChat?' has-mobile-chat':'')}>
     <aside className="z-sidebar"><div className="z-sidebar-head"><Brand/><button className="z-icon z-collapse" aria-label={compact?'Развернуть меню':'Свернуть меню'} onClick={()=>setCompact(!compact)}>{compact?<ChevronsRight size={18}/>:<ChevronsLeft size={18}/>}</button></div>
       <nav aria-label="Основная навигация">
-        <button className={uiSection==='chats'?'is-active':''} title="Чаты" onClick={()=>{setUiSection('chats');setMobileChat(false)}}><MessageCircle/><span>Чаты</span></button>
+        <button className={uiSection==='chats'?'is-active':''} title="Чаты" onClick={()=>{setUiSection('chats');setMobileChat(false)}}><MessageCircle/><span>Чаты</span>{!!unread.data?.unread_chats&&<b className="z-unread" aria-label={`Непрочитанных чатов: ${unread.data.unread_chats}`}>{unread.data.unread_chats}</b>}</button>
+        <button className={uiSection==='discovery'?'is-active':''} title="Знакомства" onClick={()=>{setUiSection('discovery');setMobileChat(true)}}><Heart/><span>Знакомства</span></button>
         <button className={uiSection==='calls'?'is-active':''} title="Звонки" onClick={()=>{setUiSection('calls');setMobileChat(true)}}><Phone/><span>Звонки</span></button>
         <button className={uiSection==='settings'?'is-active':''} title="Настройки" onClick={()=>{setUiSection('settings');setMobileChat(true)}}><Settings/><span>Настройки</span></button>
       </nav>
@@ -137,15 +159,16 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
       {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}</span><MessageCircle size={17}/></button>)}</div>}
       {create.isError&&<p className="notice">{errorText(create.error)}</p>}
       <div className="z-conversation-list">{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
-        {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.participant.name}</strong><small>Открыть переписку</small></span></button>)}
+        {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.participant.name}</strong><small>Открыть переписку</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
         {dialogs.data?.pages[0].conversations.length===0&&<div className="z-empty-copy"><MessageCircle/><p>Твой круг начинается здесь.</p><small>Найди человека по имени или почте.</small></div>}
         {dialogs.hasNextPage&&<button className="secondary" disabled={dialogs.isFetchingNextPage} onClick={()=>void dialogs.fetchNextPage()}>Ещё переписки</button>}
       </div>
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
-      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive}/></div>}
-      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p><MediaAvailability feature="profile_photos"><ProfilePhoto user={user}/></MediaAvailability></div><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
+      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive} realtimeReady={realtimeReady}/></div>}
+      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p><MediaAvailability feature="profile_photos"><ProfilePhoto user={user}/></MediaAvailability></div><ProfileEditor user={user}/><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
+      :uiSection==='discovery'?<Discovery fallbackInterval={realtimeReady?false:60_000} onSettings={()=>setUiSection('settings')}/>
       :uiSection==='calls'?<section className="z-call-lobby"><Phone size={40}/><h1>Ближе голосом</h1><p className="z-muted">{selected?'Начни видеозвонок с '+selected.participant.name:'Выбери переписку, чтобы позвонить.'}</p><p className="z-field-help">Кнопка звонка появится, когда выберешь собеседника.</p></section>
       :!selected?<div className="z-empty"><MessageCircle size={46}/><h1>На одной волне</h1><p>Выбери разговор или найди человека,<br/>с которым хочешь быть на связи.</p></div>:null}
     </div>
@@ -153,7 +176,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   </div>
 }
 
-function Messages({ conversation, user, visible, callActive }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean }) {
+function Messages({ conversation, user, visible, callActive, realtimeReady }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean;realtimeReady:boolean }) {
   const cache = useQueryClient()
   const [body, setBody] = useState('')
   const [status, setStatus] = useState('Подключаемся…')
@@ -163,51 +186,27 @@ function Messages({ conversation, user, visible, callActive }: { conversation: C
   const pending = useRef<{ body: string; id: string } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const history = useInfiniteQuery({
+    enabled: visible,
     queryKey: ['messages', conversation.id], initialPageParam: '',
     queryFn: async ({ pageParam }) => (await api.get<MessagePage>(`/conversations/${conversation.id}/messages`, { params: { before: pageParam || undefined, limit: 50 } })).data,
     getNextPageParam: (page) => page.next_cursor || undefined,
+    refetchInterval: visible && !realtimeReady ? 60_000 : false,
   })
 
-  useEffect(() => {
-    let disposed = false
-    const connection: { client?: Pusher } = {}
-    void (async () => {
-      try {
-        const { data: config } = await api.get<{ enabled: boolean; key: string; cluster: string }>('/realtime/config')
-        if (disposed) return
-        if (!config.enabled) { setStatus('Pusher отключён: заполните .env'); return }
-        const pusher = new Pusher(config.key, {
-          cluster: config.cluster, forceTLS: true,
-          channelAuthorization: {
-            customHandler: ({ socketId, channelName }, callback) => {
-              void api.post('/pusher/auth', { socket_id: socketId, channel_name: channelName })
-                .then(({ data }) => { if (!disposed) callback(null, data) })
-                .catch((error: unknown) => { if (!disposed) callback(new Error(errorText(error)), null) })
-            },
-          },
-        })
-        connection.client = pusher
-        pusher.connection.bind('state_change', ({ current }: { current: string }) => {
-          if (!disposed && current !== 'connected') setStatus(`Соединение: ${current}`)
-        })
-        pusher.connection.bind('error', () => { if (!disposed) setStatus('Ошибка соединения с Pusher') })
-        const channel = pusher.subscribe(`private-conversation-${conversation.id}`)
-        channel.bind('pusher:subscription_succeeded', () => {
-          if (disposed) return
-          setStatus('Pusher: подписка активна')
-          // Re-fetch all loaded pages after each subscription/reconnection.
-          void cache.invalidateQueries({ queryKey: ['messages', conversation.id] })
-        })
-        channel.bind('pusher:subscription_error', () => { if (!disposed) setStatus('Ошибка авторизации канала Pusher') })
-        channel.bind('message.created', ({ message }: { message: Message }) => {
-          if (disposed || message.conversation_id !== conversation.id) return
-          setLive((old) => ({ ...old, [message.id]: message }))
-          setEvents((count) => count + 1)
-        })
-      } catch (error) { if (!disposed) setStatus(errorText(error)) }
-    })()
-    return () => { disposed = true; connection.client?.disconnect() }
-  }, [cache, conversation.id])
+  const readState = useQuery({enabled:visible, queryKey:['read-state',conversation.id], queryFn:async()=>(await api.get<ReadState>(`/conversations/${conversation.id}/read`)).data, refetchInterval:realtimeReady?false:60_000})
+  useEffect(() => subscribeRealtime(`private-conversation-${conversation.id}`, {
+    'message.created': ({message}: {message: Message}) => {
+      if(message.conversation_id!==conversation.id) return
+      setLive(old=>({...old,[message.id]:message}))
+      setEvents(count=>count+1)
+    },
+  }, ready => {
+    setStatus(ready?'Pusher: подписка активна':'Связь восстанавливается…')
+    if(ready) {
+      void cache.invalidateQueries({queryKey:['messages',conversation.id]})
+      void cache.invalidateQueries({queryKey:['read-state',conversation.id]})
+    }
+  }), [cache,conversation.id])
 
   const send = useMutation({
     mutationFn: async (text: string) => {
@@ -227,6 +226,7 @@ function Messages({ conversation, user, visible, callActive }: { conversation: C
   Object.values(live).forEach((message) => merged.set(message.id, message))
   const messages = [...merged.values()].sort((a, b) => BigInt(a.id) < BigInt(b.id) ? -1 : BigInt(a.id) > BigInt(b.id) ? 1 : 0)
   const latest = messages.at(-1)?.id
+  useReadReceipt(conversation.id, latest, visible && !callActive, bottom)
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [latest])
   function submit(event: FormEvent) { event.preventDefault(); if (body.trim() && !send.isPending) send.mutate(body.trim()) }
 
@@ -236,7 +236,7 @@ function Messages({ conversation, user, visible, callActive }: { conversation: C
       {history.hasNextPage&&<button className="secondary z-older" disabled={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}>Более ранние сообщения</button>}
       {history.isPending&&<p className="z-empty-copy" role="status">Загружаем историю…</p>}{history.isError&&<p className="notice">{errorText(history.error)}</p>}
       {!history.isPending&&!history.isError&&messages.length===0&&<div className="z-empty-copy"><p>Начни разговор</p><small>Напиши первое сообщение.</small></div>}
-      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&<Check size={16} aria-label="Сохранено на сервере"/>}</div></div></div>)}<div ref={bottom}/>
+      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&(BigInt(message.id)<=BigInt(readState.data?.peer_last_read_id??'0')?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:<Check size={16} aria-label="Сохранено на сервере"/>)}</div></div></div>)}<div ref={bottom} style={{minHeight:1}}/>
     </div>
     <form noValidate className="z-composer-region" onSubmit={submit}>{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
       <div className="z-composer"><div className="z-composer-field"><textarea className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));setDelivery(result.realtime==='published'?'Голосовое сообщение сохранено.':'Запись сохранена. Собеседнику может понадобиться обновить историю.')}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending}><Send size={23}/></button></div>

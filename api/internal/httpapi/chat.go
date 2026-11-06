@@ -78,7 +78,25 @@ func (h *chatHandlers) createConversation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	// Creation is idempotent: an existing pair returns the same dialog.
+	h.notifyConversation(c.ID, user.ID, input.UserID)
 	writeJSON(w, 200, map[string]any{"conversation": c})
+}
+
+// Personal channels let clients discover dialogs they have not opened yet.
+// Only IDs are published; PostgreSQL remains the source of conversation data.
+func (h *chatHandlers) notifyConversation(id string, users ...string) {
+	h.publishConversationUpdate("conversation.updated", id, users...)
+}
+
+func (h *chatHandlers) publishConversationUpdate(event, id string, users ...string) {
+	if !h.publisher.Enabled() {
+		return
+	}
+	for _, userID := range users {
+		if err := h.publisher.Publish("private-user-"+userID, event, map[string]string{"conversation_id": id}); err != nil {
+			log.Println("Pusher: не удалось обновить список переписок; данные сохранены в PostgreSQL")
+		}
+	}
 }
 
 func (h *chatHandlers) listConversations(w http.ResponseWriter, r *http.Request, user auth.User) {
@@ -153,6 +171,9 @@ func (h *chatHandlers) sendMessage(w http.ResponseWriter, r *http.Request, user 
 			log.Println("Pusher: не удалось отправить событие; сообщение сохранено в PostgreSQL")
 			delivery = "failed"
 		}
+	}
+	if members, err := h.store.Members(r.Context(), id); err == nil {
+		h.publishConversationUpdate("conversation.message", id, members...)
 	}
 	status := 200
 	if created {
@@ -235,6 +256,10 @@ func pagination(w http.ResponseWriter, r *http.Request) (int64, int, bool) {
 }
 
 func chatFailure(w http.ResponseWriter, err error) {
+	if errors.Is(err, chat.ErrProfileRequired) {
+		writeJSON(w, 403, map[string]string{"error": "profile_required"})
+		return
+	}
 	if errors.Is(err, chat.ErrNotFound) {
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
 		return

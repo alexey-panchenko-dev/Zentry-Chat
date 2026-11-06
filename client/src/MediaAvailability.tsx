@@ -8,7 +8,7 @@ export function MediaAvailability({feature,children}:{feature:MediaFeature;child
   queryKey:['media-capabilities'],
   queryFn:async()=> (await api.get<unknown>('/realtime/config')).data,
   retry:false,
-  refetchInterval:query=>mediaCapability(query.state.data,feature)?false:30000,
+  staleTime: 5 * 60_000,
  })
  if(mediaCapability(config.data,feature))return <>{children}</>
  return <span className="z-media-unavailable" role="status">{config.isPending?'Проверяем доступность…':feature==='voice'?'Голосовые сообщения пока недоступны.':'Фото профиля пока недоступно.'}</span>

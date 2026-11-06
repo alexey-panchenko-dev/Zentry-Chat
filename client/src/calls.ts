@@ -1,4 +1,4 @@
-import Pusher from 'pusher-js'
+import { subscribeRealtime } from './realtime.ts'
 import { api, errorText } from '@/api'
 
 export type Call = {
@@ -19,7 +19,9 @@ export class CallController {
   private userID: string
   private update: (view: CallView) => void
   private disposed = false
-  private pusher?: Pusher
+  private stopRealtime?: () => void
+  private realtimeReady = false
+  private stopFocus?: () => void
   private timer?: ReturnType<typeof setInterval>
   private pc?: RTCPeerConnection
   private cursor = '0'
@@ -39,31 +41,25 @@ export class CallController {
   private failure(error: unknown) { this.emit({ error: errorText(error) }) }
 
   async connect() {
-    this.timer = setInterval(() => void this.sync(), 4000)
+    if (typeof window !== 'undefined') {
+      const recover = () => { if (!this.disposed) void this.sync() }
+      window.addEventListener('focus', recover)
+      this.stopFocus = () => window.removeEventListener('focus', recover)
+    }
+    this.timer = setInterval(() => {
+      if (this.disposed || this.realtimeReady) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden' && !active(this.view.call)) return
+      void this.sync()
+    }, 30_000)
+    this.stopRealtime = subscribeRealtime('private-user-' + this.userID, {
+      'call.updated': () => void this.sync(),
+      'call.signal': () => void this.sync(),
+    }, ready => {
+      this.realtimeReady = ready
+      this.emit({ connection: ready ? 'Канал звонков подключён' : 'Связь восстанавливается. Резервная проверка раз в 30 секунд.' })
+      if (ready) void this.sync()
+    })
     await this.sync()
-    try {
-      const { data } = await api.get('/realtime/config')
-      if (this.disposed) return
-      if (!data.enabled) { this.emit({ connection: 'Pusher отключён. Используется проверка состояния каждые 4 секунды.' }); return }
-      this.pusher = new Pusher(data.key, {
-        cluster: data.cluster, forceTLS: true,
-        channelAuthorization: { customHandler: ({ socketId, channelName }, callback) => {
-          void api.post('/pusher/auth', { socket_id: socketId, channel_name: channelName })
-            .then(({ data }) => { if (!this.disposed) callback(null, data) })
-            .catch((error: unknown) => { if (!this.disposed) callback(new Error(errorText(error)), null) })
-        } },
-      })
-      const channel = this.pusher.subscribe('private-user-' + this.userID)
-      channel.bind('pusher:subscription_succeeded', () => {
-        this.emit({ connection: 'Канал звонков подключён' }); void this.sync()
-      })
-      channel.bind('pusher:subscription_error', () => this.emit({ connection: 'Ошибка подписки. Проверяем состояние через API.' }))
-      this.pusher.connection.bind('state_change', ({ current }: { current: string }) => {
-        if (current !== 'connected') this.emit({ connection: 'Pusher: ' + current })
-      })
-      channel.bind('call.updated', () => void this.sync())
-      channel.bind('call.signal', () => void this.sync())
-    } catch (error) { this.failure(error) }
   }
 
   private apply(call: Call) {
@@ -291,7 +287,7 @@ export class CallController {
   }
   dispose() {
     this.disposed = true
-    clearInterval(this.timer); this.pusher?.disconnect()
+    clearInterval(this.timer); this.stopRealtime?.(); this.stopFocus?.()
     if (active(this.view.call)) this.abandon(this.view.call!)
     this.release()
   }
