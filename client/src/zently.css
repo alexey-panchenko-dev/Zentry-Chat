@@ -136,3 +136,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-bubble-row.is-own .z-bubble{border-color:#ff6db8;box-shadow:inset 0 1px 0 #ffc7e25e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
 .z-bubble-row:not(.is-own):not(.is-system) .z-bubble{border-color:#ff79b04d;box-shadow:inset 0 1px 0 #ffffff13,-4px 0 13px #ff14934f,0 8px 24px #00000038}
 .z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{box-shadow:0 0 8px #ff1493b0,0 0 20px #ff149368}
+
+/* Soft neon atmosphere lives in the chat background, clear of the text. */
+.z-message-scroll{background-color:#100b13;background-image:radial-gradient(ellipse 60% 45% at 7% 22%,#ff149326,transparent 74%),radial-gradient(ellipse 55% 50% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 65% 55% at 75% 8%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%;background-attachment:local}
