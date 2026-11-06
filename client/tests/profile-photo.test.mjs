@@ -8,8 +8,8 @@ test('phone photo up to 15 MiB is accepted and larger or unsupported input rejec
  assert.ok(photoInputError({type:'image/jpeg',size:0}))
 })
 test('phone photo is reduced proportionally without upscaling small images',()=>{
- assert.deepEqual(photoDimensions(6000,4000),[1024,683])
- assert.deepEqual(photoDimensions(3000,6000),[512,1024])
+ assert.deepEqual(photoDimensions(6000,4000),[512,341])
+ assert.deepEqual(photoDimensions(3000,6000),[256,512])
  assert.deepEqual(photoDimensions(200,100),[200,100])
  assert.throws(()=>photoDimensions(0,200))
 })

@@ -4,7 +4,9 @@ export function photoInputError(file:{type:string;size:number}) {
 }
 export function photoDimensions(width:number,height:number):[number,number] {
  if(!Number.isFinite(width)||!Number.isFinite(height)||width<1||height<1)throw new Error('Не удалось прочитать размер фото.')
- const scale=Math.min(1,1024/Math.max(width,height))
+ // The API normalizes to PNG. 512px also bounds normalized PNG data
+ // below its 2 MiB storage limit, even for detailed/noisy photographs.
+ const scale=Math.min(1,512/Math.max(width,height))
  return [Math.max(1,Math.round(width*scale)),Math.max(1,Math.round(height*scale))]
 }
 export async function prepareProfilePhoto(file:File):Promise<File> {

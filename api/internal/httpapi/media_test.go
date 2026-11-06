@@ -4,11 +4,35 @@ import (
 	"bytes"
 	"encoding/binary"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
 	"testing"
 )
+
+func TestOptimizedDetailedAvatarFitsStoredPNG(t *testing.T) {
+	photo := image.NewRGBA(image.Rect(0, 0, 512, 512))
+	seed := uint32(42)
+	for i := 0; i < len(photo.Pix); i += 4 {
+		for channel := 0; channel < 3; channel++ {
+			seed = seed*1664525 + 1013904223
+			photo.Pix[i+channel] = byte(seed >> 24)
+		}
+		photo.Pix[i+3] = 255
+	}
+	var uploaded bytes.Buffer
+	if err := jpeg.Encode(&uploaded, photo, &jpeg.Options{Quality: 85}); err != nil {
+		t.Fatal(err)
+	}
+	stored, mime, err := normalizePhoto(uploaded.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mime != "image/png" || len(stored) == 0 || len(stored) > 2*1024*1024 {
+		t.Fatalf("normalized avatar: MIME=%s size=%d", mime, len(stored))
+	}
+}
 
 func TestMediaValidation(t *testing.T) {
 	for _, v := range []struct {
