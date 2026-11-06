@@ -155,3 +155,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 /* One continuous chat canvas behind the history and message composer. */
 .z-messages{background-color:#100b13;background-image:radial-gradient(ellipse 60% 45% at 7% 22%,#ff149326,transparent 74%),radial-gradient(ellipse 55% 50% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 65% 55% at 75% 8%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%}
 .z-message-scroll{background:transparent}.z-composer-region{background:transparent}
+
+.z-chat-header{background:linear-gradient(110deg,#30242fba,#211d26a8 58%,#1b1920a1);border:1px solid #ff89c018;border-bottom-color:#ff89c02c;border-radius:18px;margin:10px 12px 0;padding:10px 14px;min-height:70px}
+@media(max-width:720px){.z-chat-header{margin:6px 8px 0;padding-left:38px;padding-right:42px;min-height:70px}}
