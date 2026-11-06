@@ -190,3 +190,7 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-connection-popover{position:absolute;top:42px;right:0;z-index:6;width:min(290px,calc(100vw - 45px));padding:12px 15px;border:1px solid #ff149342;border-radius:15px;background:#201721f2;box-shadow:0 16px 40px #0008;backdrop-filter:blur(20px);font-size:11px;line-height:1.6}
 .z-connection-popover p{margin:4px 0}
 @media(max-width:720px){.z-messages>.z-message-scroll{padding-bottom:106px}.z-chat-header .z-connection summary{width:28px;height:32px}.z-connection-popover{right:-30px}}
+
+/* Keep header actions clear of the call button, which sits above the chat. */
+.z-messages:not(.z-group-view)>.z-chat-header{padding-right:82px}
+@media(max-width:720px){.z-messages:not(.z-group-view)>.z-chat-header{padding-right:53px;gap:5px}}
