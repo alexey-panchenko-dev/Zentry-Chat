@@ -1,3 +1,6 @@
+import { ContactProfile } from '@/ContactProfile'
+import { ContactSettings } from '@/ContactSettings'
+import type { ProfileCallRequest } from './contact-profile'
 import { MediaAvailability } from '@/MediaAvailability'
 import { createMediaQueryStore } from './media-query'
 import { VoiceComposer } from '@/VoiceComposer'
@@ -98,6 +101,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [searchError,setSearchError]=useState('')
   const [uiSection, setUiSection] = useState<'chats'|'calls'|'settings'>('chats')
   const [callActive,setCallActive]=useState(false)
+  const [requestCall,setRequestCall]=useState<ProfileCallRequest|null>(null)
   const [compact, setCompact] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [mobileChat, setMobileChat] = useState(false)
@@ -144,18 +148,19 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
-      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive}/></div>}
-      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p><MediaAvailability feature="profile_photos"><ProfilePhoto user={user}/></MediaAvailability></div><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
+      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive} onProfileCall={()=>setRequestCall({id:crypto.randomUUID(),conversationID:selected.id})}/></div>}
+      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p><MediaAvailability feature="profile_photos"><ProfilePhoto user={user}/></MediaAvailability></div><MediaAvailability feature="contact_profiles"><ContactSettings/></MediaAvailability><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
       :uiSection==='calls'?<section className="z-call-lobby"><Phone size={40}/><h1>Ближе голосом</h1><p className="z-muted">{selected?'Начни видеозвонок с '+selected.participant.name:'Выбери переписку, чтобы позвонить.'}</p><p className="z-field-help">Кнопка звонка появится, когда выберешь собеседника.</p></section>
       :!selected?<div className="z-empty"><MessageCircle size={46}/><h1>На одной волне</h1><p>Выбери разговор или найди человека,<br/>с которым хочешь быть на связи.</p></div>:null}
     </div>
-    <CallPanel onActiveChange={setCallActive} user={user} selected={selected} soundsEnabled={soundsEnabled} conversations={dialogs.data?.pages.flatMap(page=>page.conversations)||[]}/>
+    <CallPanel requestCall={requestCall} onActiveChange={setCallActive} user={user} selected={selected} soundsEnabled={soundsEnabled} conversations={dialogs.data?.pages.flatMap(page=>page.conversations)||[]}/>
   </div>
 }
 
-function Messages({ conversation, user, visible, callActive }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean }) {
+function Messages({ conversation, user, visible, callActive, onProfileCall }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean;onProfileCall:()=>void }) {
   const cache = useQueryClient()
   const [body, setBody] = useState('')
+  const [profileOpen,setProfileOpen]=useState(false)
   const [status, setStatus] = useState('Подключаемся…')
   const [events, setEvents] = useState(0)
   const [live, setLive] = useState<Record<string, Message>>({})
@@ -231,7 +236,8 @@ function Messages({ conversation, user, visible, callActive }: { conversation: C
   function submit(event: FormEvent) { event.preventDefault(); if (body.trim() && !send.isPending) send.mutate(body.trim()) }
 
   return <section className="z-messages">
-    <header className="z-chat-header"><Avatar user={conversation.participant}/><div><h2>{conversation.participant.name}</h2><p>{status.includes('подписка активна')?'Соединение установлено':'Личная переписка'}</p></div><button className="z-icon z-history" title="Обновить историю" aria-label="Обновить историю" onClick={()=>void history.refetch()} disabled={history.isFetching}><RefreshCw size={18}/></button></header>
+    {profileOpen&&visible&&<ContactProfile conversation={conversation} onClose={()=>setProfileOpen(false)} onCall={onProfileCall} callBusy={callActive}/>}
+    <header className="z-chat-header"><button type="button" className="z-header-profile" aria-label={'Открыть профиль: '+conversation.participant.name} onClick={()=>setProfileOpen(true)}><Avatar user={conversation.participant}/><span><strong>{conversation.participant.name}</strong><small>{status.includes('подписка активна')?'Соединение установлено':'Личная переписка'}</small></span></button><button className="z-icon z-history" title="Обновить историю" aria-label="Обновить историю" onClick={()=>void history.refetch()} disabled={history.isFetching}><RefreshCw size={18}/></button></header>
     <div className="z-message-scroll">
       {history.hasNextPage&&<button className="secondary z-older" disabled={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}>Более ранние сообщения</button>}
       {history.isPending&&<p className="z-empty-copy" role="status">Загружаем историю…</p>}{history.isError&&<p className="notice">{errorText(history.error)}</p>}
