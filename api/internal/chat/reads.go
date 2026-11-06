@@ -7,9 +7,10 @@ import (
 )
 
 type ReadState struct {
-	UnreadCount    int    `json:"unread_count"`
-	LastMessageID  string `json:"last_message_id"`
-	PeerLastReadID string `json:"peer_last_read_id"`
+	PeerLastDeliveredID string `json:"peer_last_delivered_id"`
+	UnreadCount         int    `json:"unread_count"`
+	LastMessageID       string `json:"last_message_id"`
+	PeerLastReadID      string `json:"peer_last_read_id"`
 }
 
 func (s *Store) UnreadChats(ctx context.Context, user string) (int, error) {
@@ -19,7 +20,7 @@ func (s *Store) UnreadChats(ctx context.Context, user string) (int, error) {
 }
 func (s *Store) ReadState(ctx context.Context, id, user string) (ReadState, error) {
 	var state ReadState
-	err := s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>GREATEST(cm.last_read_id,cm.cleared_through) AND (m.sender_id IS NULL OR m.sender_id<>$2)),COALESCE((SELECT max(id) FROM messages WHERE conversation_id=cm.conversation_id AND id>cm.cleared_through),0)::text,COALESCE((SELECT CASE WHEN last_read_id>cm.cleared_through THEN last_read_id ELSE 0 END FROM conversation_members WHERE conversation_id=cm.conversation_id AND user_id<>$2),0)::text FROM conversation_members cm WHERE cm.conversation_id=$1 AND cm.user_id=$2`, id, user).Scan(&state.UnreadCount, &state.LastMessageID, &state.PeerLastReadID)
+	err := s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>GREATEST(cm.last_read_id,cm.cleared_through) AND (m.sender_id IS NULL OR m.sender_id<>$2)),COALESCE((SELECT max(id) FROM messages WHERE conversation_id=cm.conversation_id AND id>cm.cleared_through),0)::text,COALESCE((SELECT CASE WHEN viewed_through>cm.cleared_through THEN viewed_through ELSE 0 END FROM conversation_members WHERE conversation_id=cm.conversation_id AND user_id<>$2),0)::text,COALESCE((SELECT received_through FROM conversation_members WHERE conversation_id=cm.conversation_id AND user_id<>$2),0)::text FROM conversation_members cm WHERE cm.conversation_id=$1 AND cm.user_id=$2`, id, user).Scan(&state.UnreadCount, &state.LastMessageID, &state.PeerLastReadID, &state.PeerLastDeliveredID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -49,7 +50,7 @@ func (s *Store) MarkRead(ctx context.Context, id, user string, through int64) (s
 		return "", nil, ErrNotFound
 	}
 	var cursor string
-	err = tx.QueryRow(ctx, `UPDATE conversation_members SET last_read_id=GREATEST(last_read_id,$3) WHERE conversation_id=$1 AND user_id=$2 RETURNING last_read_id::text`, id, user, through).Scan(&cursor)
+	err = tx.QueryRow(ctx, `UPDATE conversation_members SET last_read_id=GREATEST(last_read_id,$3),viewed_through=GREATEST(viewed_through,$3),received_through=GREATEST(received_through,$3) WHERE conversation_id=$1 AND user_id=$2 RETURNING last_read_id::text`, id, user, through).Scan(&cursor)
 	if err != nil {
 		return "", nil, err
 	}

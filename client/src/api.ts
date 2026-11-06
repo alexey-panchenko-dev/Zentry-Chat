@@ -10,7 +10,7 @@ export const api = axios.create({
 export type User = { id: string; name: string; avatar_url?: string }
 export type Conversation = { id: string; participant: User; unread_count?: number }
 export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string }
-export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string }
+export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string; peer_last_delivered_id?:string }
 export type Message = {
   id: string
   conversation_id: string
