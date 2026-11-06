@@ -131,3 +131,8 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{top:19px;bottom:19px;width:2px;background:linear-gradient(transparent,#ff54ad,#ff1493,transparent);box-shadow:0 0 8px #ff14938a,0 0 18px #ff14934d}
 
 .z-bubble-row.is-own .z-bubble{border-radius:22px 22px 7px 22px}
+
+/* Focus the neon on messages rather than the whole conversation canvas. */
+.z-bubble-row.is-own .z-bubble{border-color:#ff6db8;box-shadow:inset 0 1px 0 #ffc7e25e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{border-color:#ff79b04d;box-shadow:inset 0 1px 0 #ffffff13,-4px 0 13px #ff14934f,0 8px 24px #00000038}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{box-shadow:0 0 8px #ff1493b0,0 0 20px #ff149368}
