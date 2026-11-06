@@ -21,6 +21,7 @@ const actionDescription:Record<ControlAction,string>={
 export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=false,controls}:{conversation:Conversation;onClose:()=>void;onCall:()=>void;onRemoved:(id:string,action:RemovalAction)=>void;callBusy?:boolean;controls:ConversationControlView}) {
  const dialog=useRef<HTMLDialogElement>(null)
  const menu=useRef<HTMLDetailsElement>(null)
+ const backdropPress=useRef(false)
  const [confirmation,setConfirmation]=useState<ControlAction|null>(null)
  const [completed,setCompleted]=useState('')
  const previousConfirmation=useRef<ControlAction|null>(null)
@@ -49,7 +50,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
   const action=confirmation;const id=conversation.id
   try{const state=await controls.action.mutateAsync({value:action,id});if(isRemovalAction(action)&&removalCommitted(action,state)){close();onRemoved(id,action);return}setCompleted(action==='block'?'Контакт заблокирован.':action==='unblock'?'Контакт разблокирован.':'Изменения сохранены.');setConfirmation(null)}catch{/* Keep the confirmation and its request error for retry. */}
  }
- return createPortal(<dialog ref={dialog} className="z-contact-dialog" aria-labelledby="contact-profile-title" onCancel={event=>{
+ return createPortal(<dialog ref={dialog} className="z-contact-dialog" aria-labelledby="contact-profile-title" onPointerDown={event=>{const rect=event.currentTarget.getBoundingClientRect();backdropPress.current=event.target===event.currentTarget&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)}} onPointerCancel={()=>{backdropPress.current=false}} onClick={event=>{const startedOutside=backdropPress.current;backdropPress.current=false;if(!startedOutside||event.target!==event.currentTarget||controls.action.isPending)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close()}} onCancel={event=>{
   event.preventDefault();if(controls.action.isPending)return
   if(confirmation){setConfirmation(null);return}
   if(menu.current?.open){menu.current.open=false;menu.current.querySelector<HTMLElement>('summary')?.focus();return}close()
