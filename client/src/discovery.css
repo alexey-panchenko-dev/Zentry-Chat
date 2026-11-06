@@ -1,0 +1,125 @@
+.z-discovery {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  padding: 32px clamp(20px, 3vw, 40px);
+}
+.z-discovery-header, .z-discovery-content {
+  width: 100%;
+  max-width: 960px;
+  margin-inline: auto;
+}
+.z-discovery h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.z-discovery h1 svg { flex-shrink: 0; width: 26px; height: 26px; }
+.z-discovery-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+.z-discovery-tabs button {
+  min-height: 46px;
+  border: 1px solid var(--z-line);
+  background: var(--z-card);
+  padding: 11px 18px;
+  border-radius: 16px;
+  line-height: 1.4;
+}
+.z-discovery-tabs .is-active { background: var(--z-lime); color: var(--z-bg); border-color: var(--z-lime); }
+.z-discovery-content { margin-top: 28px; display: grid; gap: 20px; }
+.z-discovery-content > .notice, .z-discovery-content > p { margin: 0; }
+.z-discovery-content > .secondary { justify-self: start; }
+.z-discovery-card {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid var(--z-line);
+  border-radius: 28px;
+  background: var(--z-surface);
+}
+/* Full profile photos must not inherit the small circular avatar crop. */
+.z-discovery-photo {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: clamp(220px, 42dvh, 400px);
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  background: radial-gradient(ellipse at center, #342130, var(--z-card));
+}
+.z-discovery-photo > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 0;
+}
+.z-discovery-initials { font-size: clamp(48px, 6vw, 72px); font-weight: 650; color: #e8d8e2; line-height: 1; }
+.z-discovery-details { display: grid; gap: 10px; min-width: 0; }
+.z-discovery-details h2 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.z-discovery-details p { margin: 0; }
+.z-discovery-details .z-muted { font-size: 13px; line-height: 1.5; }
+.z-discovery-bio { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.z-discovery-actions { display: flex; justify-content: center; gap: 24px; padding-top: 4px; }
+.z-discovery-actions button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--z-bg);
+}
+.z-skip { background: var(--z-pink); }
+.z-like { background: var(--z-lime); }
+.z-discovery-empty {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  max-width: 440px;
+  width: 100%;
+  margin: clamp(24px, 7dvh, 72px) auto;
+  padding: 32px 24px;
+  border: 1px solid var(--z-line);
+  border-radius: 24px;
+  background: var(--z-surface);
+  text-align: center;
+}
+.z-discovery-empty > svg { color: var(--z-pink); margin-bottom: 4px; }
+.z-discovery-empty h2 { margin: 0; font-size: 21px; font-weight: 700; line-height: 1.4; }
+.z-discovery-empty p { margin: 0; color: var(--z-muted); font-size: 14px; line-height: 1.7; }
+.z-discovery-empty button { margin-top: 8px; }
+.z-likes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+.z-like-preview {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--z-line);
+  background: var(--z-card);
+  overflow-wrap: anywhere;
+}
+.z-like-preview small { color: var(--z-muted); }
+@media (max-width: 720px) {
+  .z-discovery { padding: 70px 18px 24px; }
+  .z-discovery h1 { font-size: 21px; }
+  .z-discovery-tabs { margin-top: 20px; gap: 8px; }
+  .z-discovery-tabs button { padding: 11px 14px; font-size: 13px; }
+  .z-discovery-content { margin-top: 24px; }
+  .z-discovery-card { gap: 18px; padding: 16px; border-radius: 24px; }
+  .z-discovery-photo { height: clamp(220px, 38dvh, 340px); border-radius: 14px; }
+  .z-discovery-details h2 { font-size: 20px; }
+  .z-discovery-empty { margin: 24px auto; padding: 28px 18px; }
+}
