@@ -333,3 +333,20 @@ test('late state request from previous call cannot replace a newer call or stop 
   await client.finish()
  }finally{callTestAPI.get=original;client.dispose()}
 })
+
+test('active audio diagnostics refresh locally without polling HTTP',async()=>{
+ reset();navigator.mediaDevices.getUserMedia=async()=>microphoneOnly()
+ const originalTimer=globalThis.setInterval,originalClear=globalThis.clearInterval,originalGet=callTestAPI.get
+ let tickStats,requests=0
+ globalThis.setInterval=(fn,ms)=>{assert.equal(ms,1000);tickStats=fn;return 123}
+ globalThis.clearInterval=()=>{}
+ callTestAPI.get=async(...args)=>{requests++;return originalGet(...args)}
+ const client=new CallController('me',()=>{})
+ try{
+  await client.start('dialog');current={...current,status:'accepted',version:2};await client.sync()
+  Peer.instances[0].getStats=async()=>[{type:'outbound-rtp',kind:'audio',bytesSent:4096}]
+  const before=requests;tickStats();await turn()
+  assert.equal(client.view.audio.sent,4096);assert.equal(requests,before)
+  await client.finish()
+ }finally{client.dispose();globalThis.setInterval=originalTimer;globalThis.clearInterval=originalClear;callTestAPI.get=originalGet}
+})

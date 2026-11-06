@@ -32,7 +32,6 @@ function VideoStream({ stream, muted = false, label, user }: { stream: MediaStre
       {!hasVideo&&<div className="z-call-audio-avatar"><Avatar user={user} large/><strong>{user.name}</strong><p>Камера выключена</p></div>}
       {muted&&hasVideo&&<span className="absolute left-3 top-2 rounded bg-black/60 px-2 py-1 text-xs">{label}</span>}
     </div>
-    {!muted && <details className="z-remote-audio"><summary>Звук собеседника</summary><RemoteAudio stream={stream} /></details>}
   </div>
 }
 export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange }: { onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
@@ -77,6 +76,7 @@ export function CallPanel({ user, selected, conversations = [], soundsEnabled = 
       </div>
       {call.status==='accepted'&&!view.local&&<p className="notice z-call-recovery">Медиа соединение не восстановлено после перезагрузки. Завершите звонок и позвоните заново.</p>}
       {(view.local||view.remote)?<div className="z-video-stage"><VideoStream stream={view.remote} user={callPeer||{id:'caller',name:'Собеседник'}} label="Собеседник"/><VideoStream stream={view.local} user={user} muted label="Вы"/></div>:<div className="z-call-wait"><Avatar user={callPeer||{id:'caller',name:'Входящий звонок'}} large/><h2>{incoming?'Тебе звонят':'Вызываем собеседника…'}</h2><p>Для ответа нужен только микрофон.<br/>Камеру можно включить во время звонка.</p></div>}
+      {call.status==='accepted'&&<div className="z-remote-audio z-call-playback"><RemoteAudio stream={view.remote}/></div>}
       {soundBlocked&&call.status==="ringing"&&soundsEnabled&&<button className="secondary z-unlock-ring" onClick={()=>void sounds?.unlock().then(ok=>{if(ok)setSoundBlocked(false)})}>Включить звук звонка</button>}<div className="z-call-dock">{incoming&&call.status==='ringing'&&<button className="primary" disabled={view.busy} onClick={()=>void controller.current?.action('accept')}><Phone size={20}/>Ответить</button>}
         {view.local&&<><button className="z-icon" title="Микрофон" aria-label="Переключить микрофон" aria-pressed={!!view.local.getAudioTracks()[0]?.enabled} onClick={()=>controller.current?.toggle('audio')}>{view.local.getAudioTracks()[0]?.enabled?<Mic size={22}/>:<MicOff size={22}/>}</button><button className="z-icon" title={view.cameraBusy?'Подключаем камеру…':view.local.getVideoTracks().length?'Выключить камеру':'Включить камеру'} aria-label="Переключить камеру" aria-pressed={!!view.local.getVideoTracks().length} disabled={view.cameraBusy} onClick={()=>void controller.current?.toggleCamera()}>{view.local.getVideoTracks().length?<Video size={22}/>:<VideoOff size={22}/>}</button></>}
         <button className="z-icon z-end-call" aria-label={call.status==='accepted'?'Завершить звонок':incoming?'Отклонить звонок':'Отменить звонок'} onClick={()=>void controller.current?.finish()}><PhoneOff size={23}/></button>

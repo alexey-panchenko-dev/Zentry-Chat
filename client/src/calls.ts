@@ -1,5 +1,6 @@
 import { subscribeRealtime } from './realtime.ts'
 import { api, errorText } from '@/api'
+import { AudioMeter } from './audio-meter.ts'
 
 export type Call = {
   id: string; conversation_id: string; caller_id: string; callee_id: string
@@ -46,6 +47,8 @@ export class CallController {
   private generation = 0
   private videoSender?: RTCRtpSender
   private finishing = false
+  private inputMeter = new AudioMeter()
+  private audioTimer?: ReturnType<typeof setInterval>
 
   constructor(userID: string, update: (view: CallView) => void) { this.userID = userID; this.update = update }
   private emit(patch: Partial<CallView>) {
@@ -156,6 +159,7 @@ export class CallController {
 
   async start(conversationID: string) {
     if (this.disposed || this.view.busy || active(this.view.call)) return
+    this.inputMeter.unlock()
     this.emit({ busy: true, error: '', cameraError: '' })
     try {
       // Reserve the call first; applying a new call resets resources.
@@ -176,6 +180,7 @@ export class CallController {
   async action(action: 'accept' | 'reject' | 'cancel' | 'end') {
     const call = this.view.call
     if (this.disposed || !call || this.view.busy) return
+    if (action === 'accept') this.inputMeter.unlock()
     this.emit({ busy: true, error: '' })
     try {
       if (action === 'accept') await this.media()
@@ -226,6 +231,9 @@ export class CallController {
     if (!this.pc) {
       const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
       this.pc = pc
+      this.audioTimer = setInterval(() => void this.inspectAudio(), 1000)
+      // Node controller tests should not be kept alive by a failed assertion.
+      ;(this.audioTimer as unknown as {unref?:()=>void}).unref?.()
       const remote = new MediaStream()
       this.emit({ remote, connection: 'Устанавливаем соединение…' })
       this.view.local.getAudioTracks().forEach((track) => pc.addTrack(track, this.view.local!))
@@ -309,6 +317,7 @@ export class CallController {
 
   toggle(kind: 'audio' | 'video') {
     if (kind === 'video') { void this.toggleCamera(); return }
+    this.inputMeter.unlock()
     const tracks = this.view.local?.getTracks().filter((track) => track.kind === kind) ?? []
     tracks.forEach((track) => { track.enabled = !track.enabled })
     this.emit({})
@@ -383,10 +392,14 @@ export class CallController {
         if (report.type === 'media-source' && typeof report.audioLevel === 'number') inputLevel = report.audioLevel
       })
       const tracks = this.view.local?.getAudioTracks() ?? []
+      if (this.view.local) inputLevel = this.inputMeter.sample(this.view.local) ?? inputLevel
       this.emit({ audio: { sent, received, inputLevel, inputEnabled: tracks.some(t => t.enabled && t.readyState === 'live'), inputMuted: tracks.length === 0 || tracks.every(t => t.muted) } })
     } catch { /* Diagnostics must not interrupt a working call. */ }
   }
   private release() {
+    if(this.audioTimer!==undefined) clearInterval(this.audioTimer)
+    this.audioTimer=undefined
+    this.inputMeter.disconnect()
     this.generation++
     this.cancelMedia?.(); this.cancelMedia = undefined
     this.cancelCamera?.(); this.cancelCamera = undefined
@@ -409,6 +422,7 @@ export class CallController {
     clearInterval(this.timer); this.stopRealtime?.(); this.stopFocus?.()
     if (active(this.view.call)) this.abandon(this.view.call!)
     this.release()
+    this.inputMeter.dispose()
   }
 }
 
