@@ -48,3 +48,5 @@ ProfilePhoto validates JPG/PNG up to15 MiB, then opens AvatarCropper in the exis
 Contact profiles render in the body top layer; the application behind an open profile is blurred independently for browsers that omit backdrop filtering. Birthday always has a labelled row, including an honest missing-date state for older accounts.
 
 Message receipts: one dark tick is server-saved, two dark ticks require a recipient browser acknowledgement after receiving actual envelopes; two lime ticks require the existing focused visible-chat viewport receipt. Clearing history is not reading. Incoming bubbles use an opaque graphite surface with a restrained pink edge; the chat background has a very low-contrast dot texture. Sidebar header, navigation rows and account footer keep equal vertical dimensions in both width modes; the logo is centered.
+
+Sidebar and conversation-list surfaces share a restrained pink/lime atmospheric tint. Sidebar uses faint diagonal lines; the list uses a low-contrast dot texture. CSS backgrounds are static and stay within panel radii without overlaying or intercepting controls.
