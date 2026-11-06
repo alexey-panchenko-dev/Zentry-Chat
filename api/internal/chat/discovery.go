@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"newsChat/api/internal/auth"
+	"newsChat/api/internal/contactguard"
+	"time"
 )
 
 var ErrProfileRequired = errors.New("profile required")
@@ -15,7 +18,7 @@ type Profile struct {
 	City string `json:"city"`
 }
 
-const profileColumns = `u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),p.age,COALESCE(p.bio,''),COALESCE(p.city,'')`
+const profileColumns = `u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),CASE WHEN p.birth_date IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE,p.birth_date))::integer ELSE p.age END,COALESCE(p.bio,''),COALESCE(p.city,'')`
 
 func scanProfile(row pgx.Row) (Profile, error) {
 	var p Profile
@@ -28,7 +31,33 @@ func scanProfile(row pgx.Row) (Profile, error) {
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
 	return scanProfile(s.db.QueryRow(ctx, `SELECT `+profileColumns+` FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id))
 }
+
+type OwnerProfile struct {
+	Profile
+	BirthDate *string `json:"birth_date"`
+}
+
+func (s *Store) OwnProfile(ctx context.Context, id string) (OwnerProfile, error) {
+	p, err := s.Profile(ctx, id)
+	if err != nil {
+		return OwnerProfile{}, err
+	}
+	result := OwnerProfile{Profile: p}
+	err = s.db.QueryRow(ctx, `SELECT to_char(p.birth_date,'YYYY-MM-DD') FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id).Scan(&result.BirthDate)
+	return result, err
+}
 func (s *Store) UpdateProfile(ctx context.Context, id, name string, age *int, bio, city string) (Profile, error) {
+	return s.UpdateProfileWithBirthDate(ctx, id, name, age, bio, city, nil)
+}
+func (s *Store) UpdateProfileWithBirthDate(ctx context.Context, id, name string, age *int, bio, city string, birthDate *string) (Profile, error) {
+	var date any
+	if birthDate != nil {
+		d, err := auth.ParseBirthDate(*birthDate, time.Now())
+		if err != nil {
+			return Profile{}, err
+		}
+		date = d
+	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return Profile{}, err
@@ -37,7 +66,7 @@ func (s *Store) UpdateProfile(ctx context.Context, id, name string, age *int, bi
 	if _, err = tx.Exec(ctx, `UPDATE users SET name=$2 WHERE id=$1`, id, name); err != nil {
 		return Profile{}, err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO user_profiles(user_id,age,bio,city) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET age=EXCLUDED.age,bio=EXCLUDED.bio,city=EXCLUDED.city`, id, age, bio, city); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO user_profiles(user_id,age,bio,city,birth_date) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET age=EXCLUDED.age,bio=EXCLUDED.bio,city=EXCLUDED.city,birth_date=COALESCE(EXCLUDED.birth_date,user_profiles.birth_date)`, id, age, bio, city, date); err != nil {
 		return Profile{}, err
 	}
 	p, err := scanProfile(tx.QueryRow(ctx, `SELECT `+profileColumns+` FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id))
@@ -58,7 +87,7 @@ func (s *Store) Discovery(ctx context.Context, id string, incoming bool) ([]Prof
 	if incoming {
 		filter = `EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=u.id AND v.target_id=$1 AND v.liked) AND NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id)`
 	}
-	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id<>$1 AND p.age IS NOT NULL AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
+	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +110,18 @@ func (s *Store) Vote(ctx context.Context, actor, target string, liked bool) (str
 		return "", err
 	}
 	defer tx.Rollback(context.Background())
+	if err = contactguard.LockUsers(ctx, tx, actor, target); err != nil {
+		return "", err
+	}
+	if err = contactguard.CheckBlocked(ctx, tx, actor, target); err != nil {
+		return "", err
+	}
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(LEAST($1::uuid,$2::uuid)::text||GREATEST($1::uuid,$2::uuid)::text, 101))`, actor, target); err != nil {
 		return "", err
 	}
 	for i, id := range []string{actor, target} {
 		var ready bool
-		err = tx.QueryRow(ctx, `SELECT age IS NOT NULL AND bio<>'' FROM user_profiles WHERE user_id=$1`, id).Scan(&ready)
+		err = tx.QueryRow(ctx, `SELECT (age IS NOT NULL OR birth_date IS NOT NULL) AND bio<>'' FROM user_profiles WHERE user_id=$1`, id).Scan(&ready)
 		if errors.Is(err, pgx.ErrNoRows) || err == nil && !ready {
 			if i == 0 {
 				return "", ErrProfileRequired

@@ -187,7 +187,7 @@ func (h *chatHandlers) realtimeConfig(w http.ResponseWriter, r *http.Request, us
 	for key, value := range h.publisher.PublicConfig() {
 		config[key] = value
 	}
-	config["media"] = map[string]bool{"voice": true, "profile_photos": true, "contact_profiles": true}
+	config["media"] = map[string]bool{"voice": true, "profile_photos": true, "contact_profiles": true, "chat_controls": true, "chat_images": true}
 	writeJSON(w, 200, config)
 }
 
@@ -256,6 +256,10 @@ func pagination(w http.ResponseWriter, r *http.Request) (int64, int, bool) {
 }
 
 func chatFailure(w http.ResponseWriter, err error) {
+	if errors.Is(err, chat.ErrBlocked) {
+		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
+		return
+	}
 	if errors.Is(err, chat.ErrProfileRequired) {
 		writeJSON(w, 403, map[string]string{"error": "profile_required"})
 		return

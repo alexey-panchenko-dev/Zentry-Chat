@@ -22,9 +22,10 @@ type authHandlers struct{ service *auth.Service }
 
 func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name     string `json:"name"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		BirthDate *string `json:"birth_date"`
+		Name      string  `json:"name"`
+		Email     string  `json:"email"`
+		Password  string  `json:"password"`
 	}
 
 	if !readAuthJSON(w, r, &input) {
@@ -46,11 +47,17 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := h.service.Register(
+	if input.BirthDate != nil {
+		if _, err := auth.ParseBirthDate(*input.BirthDate, time.Now()); err != nil {
+			writeJSON(w, 400, map[string]string{"error": "invalid_birth_date"})
+			return
+		}
+	}
+	u, err := h.service.RegisterWithBirthDate(
 		r.Context(),
 		input.Name,
 		email,
-		input.Password)
+		input.Password, input.BirthDate)
 	if errors.Is(err, auth.ErrEmailExists) {
 		writeJSON(w, 409, map[string]string{"error": "email_already_registered"})
 		return

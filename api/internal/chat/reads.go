@@ -14,12 +14,12 @@ type ReadState struct {
 
 func (s *Store) UnreadChats(ctx context.Context, user string) (int, error) {
 	var count int
-	err := s.db.QueryRow(ctx, `SELECT count(*) FROM conversation_members cm WHERE cm.user_id=$1 AND EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>cm.last_read_id AND (m.sender_id IS NULL OR m.sender_id<>$1))`, user).Scan(&count)
+	err := s.db.QueryRow(ctx, `SELECT count(*) FROM conversation_members cm WHERE cm.user_id=$1 AND NOT cm.hidden AND EXISTS(SELECT 1 FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>GREATEST(cm.last_read_id,cm.cleared_through) AND (m.sender_id IS NULL OR m.sender_id<>$1))`, user).Scan(&count)
 	return count, err
 }
 func (s *Store) ReadState(ctx context.Context, id, user string) (ReadState, error) {
 	var state ReadState
-	err := s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>cm.last_read_id AND (m.sender_id IS NULL OR m.sender_id<>$2)),COALESCE((SELECT max(id) FROM messages WHERE conversation_id=cm.conversation_id),0)::text,COALESCE((SELECT last_read_id FROM conversation_members WHERE conversation_id=cm.conversation_id AND user_id<>$2),0)::text FROM conversation_members cm WHERE cm.conversation_id=$1 AND cm.user_id=$2`, id, user).Scan(&state.UnreadCount, &state.LastMessageID, &state.PeerLastReadID)
+	err := s.db.QueryRow(ctx, `SELECT (SELECT count(*) FROM messages m WHERE m.conversation_id=cm.conversation_id AND m.id>GREATEST(cm.last_read_id,cm.cleared_through) AND (m.sender_id IS NULL OR m.sender_id<>$2)),COALESCE((SELECT max(id) FROM messages WHERE conversation_id=cm.conversation_id AND id>cm.cleared_through),0)::text,COALESCE((SELECT CASE WHEN last_read_id>cm.cleared_through THEN last_read_id ELSE 0 END FROM conversation_members WHERE conversation_id=cm.conversation_id AND user_id<>$2),0)::text FROM conversation_members cm WHERE cm.conversation_id=$1 AND cm.user_id=$2`, id, user).Scan(&state.UnreadCount, &state.LastMessageID, &state.PeerLastReadID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -41,7 +41,7 @@ func (s *Store) MarkRead(ctx context.Context, id, user string, through int64) (s
 	if err != nil {
 		return "", nil, err
 	}
-	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM messages WHERE conversation_id=$1 AND id=$2)`, id, through).Scan(&exists)
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM messages WHERE conversation_id=$1 AND id=$2 AND id>(SELECT cleared_through FROM conversation_members WHERE conversation_id=$1 AND user_id=$3))`, id, through, user).Scan(&exists)
 	if err != nil {
 		return "", nil, err
 	}

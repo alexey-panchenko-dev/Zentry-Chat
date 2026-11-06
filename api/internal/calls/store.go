@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"newsChat/api/internal/contactguard"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -62,8 +63,8 @@ func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 // Expiry is persisted lazily when reading/changing calls or making a new call.
 func expire(ctx context.Context, tx pgx.Tx) error {
-	_, err := tx.Exec(ctx, `UPDATE calls SET status='expired',version=version+1,updated_at=now()
-        WHERE status IN ('ringing','accepted') AND expires_at<=now()`)
+	_, err := tx.Exec(ctx, `WITH expired AS (SELECT id FROM calls WHERE status IN ('ringing','accepted') AND expires_at<=now() ORDER BY id FOR UPDATE SKIP LOCKED)
+ UPDATE calls SET status='expired',version=version+1,updated_at=now() WHERE id IN (SELECT id FROM expired)`)
 	if err != nil {
 		return err
 	}
@@ -98,16 +99,12 @@ func (s *Store) Create(ctx context.Context, convID, userID, clientID string) (Ca
 	if err != nil {
 		return Call{}, false, err
 	}
-	// Lock participants in a deterministic order to serialize competing calls.
-	rows, err := tx.Query(ctx, "SELECT id FROM users WHERE id IN ($1,$2) ORDER BY id FOR UPDATE", userID, peer)
-	if err != nil {
+	// Users first, then call rows, then conversations (shared with block/send).
+	if err = contactguard.LockUsers(ctx, tx, userID, peer); err != nil {
 		return Call{}, false, err
 	}
-	for rows.Next() {
-	}
-	rows.Close()
-	if rows.Err() != nil {
-		return Call{}, false, rows.Err()
+	if err = contactguard.CheckBlocked(ctx, tx, userID, peer); err != nil {
+		return Call{}, false, err
 	}
 	if err := expire(ctx, tx); err != nil {
 		return Call{}, false, err
@@ -194,6 +191,23 @@ func (s *Store) Transition(ctx context.Context, id, userID, action string) (Call
 		return Call{}, err
 	}
 	defer rollback(tx)
+	// Read participant IDs without a row lock, then take deterministic user
+	// locks before touching call rows. Re-read the call after acquiring locks.
+	initial, err := scanCall(tx.QueryRow(ctx, "SELECT "+columns+" FROM calls WHERE id=$1 AND (caller_id=$2 OR callee_id=$2)", id, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Call{}, ErrNotFound
+	}
+	if err != nil {
+		return Call{}, err
+	}
+	if err = contactguard.LockUsers(ctx, tx, initial.CallerID, initial.CalleeID); err != nil {
+		return Call{}, err
+	}
+	if action == "accept" {
+		if err = contactguard.CheckBlocked(ctx, tx, initial.CallerID, initial.CalleeID); err != nil {
+			return Call{}, err
+		}
+	}
 	if err := expire(ctx, tx); err != nil {
 		return Call{}, err
 	}
@@ -251,6 +265,19 @@ func (s *Store) SendSignal(ctx context.Context, id, userID, clientID, kind strin
 		return Signal{}, false, err
 	}
 	defer rollback(tx)
+	initial, err := scanCall(tx.QueryRow(ctx, "SELECT "+columns+" FROM calls WHERE id=$1 AND (caller_id=$2 OR callee_id=$2)", id, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Signal{}, false, ErrNotFound
+	}
+	if err != nil {
+		return Signal{}, false, err
+	}
+	if err = contactguard.LockUsers(ctx, tx, initial.CallerID, initial.CalleeID); err != nil {
+		return Signal{}, false, err
+	}
+	if err = contactguard.CheckBlocked(ctx, tx, initial.CallerID, initial.CalleeID); err != nil {
+		return Signal{}, false, err
+	}
 	if err := expire(ctx, tx); err != nil {
 		return Signal{}, false, err
 	}

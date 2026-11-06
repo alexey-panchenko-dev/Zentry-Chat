@@ -17,7 +17,7 @@ func (s *Store) SendVoice(ctx context.Context, c, u, id, mime string, data []byt
 		return Message{}, false, err
 	}
 	defer tx.Rollback(context.Background())
-	if _, err = tx.Exec(ctx, "SELECT id FROM conversations WHERE id=$1 FOR UPDATE", c); err != nil {
+	if err = lockSending(ctx, tx, c, u); err != nil {
 		return Message{}, false, err
 	}
 	var m Message
@@ -37,12 +37,17 @@ func (s *Store) SendVoice(ctx context.Context, c, u, id, mime string, data []byt
 	if err != nil {
 		return m, created, err
 	}
+	if !created {
+		if err = checkMessageVisible(ctx, tx, c, u, m.ID); err != nil {
+			return Message{}, false, err
+		}
+	}
 	return m, created, tx.Commit(ctx)
 }
 func (s *Store) Audio(ctx context.Context, id, u string) ([]byte, string, error) {
 	var b []byte
 	var mime string
-	err := s.db.QueryRow(ctx, `SELECT m.audio,m.audio_mime FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$2 WHERE m.id=$1 AND m.kind='voice'`, id, u).Scan(&b, &mime)
+	err := s.db.QueryRow(ctx, `SELECT m.audio,m.audio_mime FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$2 WHERE m.id=$1 AND m.id>cm.cleared_through AND m.kind='voice'`, id, u).Scan(&b, &mime)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}

@@ -1,4 +1,4 @@
-export type MediaFeature = 'voice' | 'profile_photos' | 'contact_profiles'
+export type MediaFeature = 'voice' | 'profile_photos' | 'contact_profiles' | 'chat_controls' | 'chat_images' | 'chat_removal'
 export function mediaCapability(config: unknown, feature: MediaFeature): boolean {
  if (!config || typeof config !== 'object' || !('media' in config)) return false
  const media = config.media

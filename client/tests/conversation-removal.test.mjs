@@ -1,0 +1,5 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {isRemovalAction,removalCommitted,withoutConversation} from '../src/conversation-controls.ts'
+test('only committed hidden deletion/removal actions navigate away',()=>{assert.equal(isRemovalAction('delete_chat'),true);assert.equal(isRemovalAction('remove_contact'),true);assert.equal(isRemovalAction('clear'),false);assert.equal(removalCommitted('delete_chat',{hidden:true}),true);assert.equal(removalCommitted('remove_contact',{hidden:false}),false);assert.equal(removalCommitted('block',{hidden:true}),false);assert.equal(removalCommitted('delete_chat',{}),false)})
+test('actor list removal preserves other dialogs, pagination and source data',()=>{const pages=[{conversations:[{id:'1'},{id:'2'}],next_cursor:'cursor'},{conversations:[{id:'3'}],next_cursor:''}];const next=withoutConversation(pages,'2');assert.deepEqual(next[0].conversations,[{id:'1'}]);assert.equal(next[0].next_cursor,'cursor');assert.equal(next[1].conversations[0].id,'3');assert.equal(pages[0].conversations.length,2)})

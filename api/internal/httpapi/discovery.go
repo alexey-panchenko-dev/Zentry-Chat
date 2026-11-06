@@ -5,11 +5,12 @@ import (
 	"newsChat/api/internal/auth"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
 func (h *chatHandlers) getProfile(w http.ResponseWriter, r *http.Request, u auth.User) {
-	p, err := h.store.Profile(r.Context(), u.ID)
+	p, err := h.store.OwnProfile(r.Context(), u.ID)
 	if err != nil {
 		chatFailure(w, err)
 		return
@@ -18,10 +19,11 @@ func (h *chatHandlers) getProfile(w http.ResponseWriter, r *http.Request, u auth
 }
 func (h *chatHandlers) updateProfile(w http.ResponseWriter, r *http.Request, u auth.User) {
 	var input struct {
-		Name string `json:"name"`
-		Age  *int   `json:"age"`
-		Bio  string `json:"bio"`
-		City string `json:"city"`
+		BirthDate *string `json:"birth_date"`
+		Name      string  `json:"name"`
+		Age       *int    `json:"age"`
+		Bio       string  `json:"bio"`
+		City      string  `json:"city"`
 	}
 	if !readAuthJSON(w, r, &input) {
 		return
@@ -39,7 +41,18 @@ func (h *chatHandlers) updateProfile(w http.ResponseWriter, r *http.Request, u a
 		writeJSON(w, 400, map[string]string{"error": "invalid_profile"})
 		return
 	}
-	p, err := h.store.UpdateProfile(r.Context(), u.ID, input.Name, input.Age, input.Bio, input.City)
+	if input.BirthDate != nil {
+		if _, err := auth.ParseBirthDate(*input.BirthDate, time.Now()); err != nil {
+			writeJSON(w, 400, map[string]string{"error": "invalid_birth_date"})
+			return
+		}
+	}
+	_, err := h.store.UpdateProfileWithBirthDate(r.Context(), u.ID, input.Name, input.Age, input.Bio, input.City, input.BirthDate)
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
+	p, err := h.store.OwnProfile(r.Context(), u.ID)
 	if err != nil {
 		chatFailure(w, err)
 		return

@@ -43,18 +43,42 @@ func New(db *pgxpool.Pool) *Service {
 }
 
 func (s *Service) Register(ctx context.Context, name, email, password string) (User, error) {
+	return s.RegisterWithBirthDate(ctx, name, email, password, nil)
+}
+func (s *Service) RegisterWithBirthDate(ctx context.Context, name, email, password string, birthDate *string) (User, error) {
+	var date any
+	if birthDate != nil {
+		d, err := ParseBirthDate(*birthDate, time.Now())
+		if err != nil {
+			return User{}, err
+		}
+		date = d
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer tx.Rollback(context.Background())
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return User{}, err
 	}
 	var u User
-	err = s.db.QueryRow(ctx, `INSERT INTO users (name,email,password_hash) VALUES ($1,$2,$3)
+	err = tx.QueryRow(ctx, `INSERT INTO users (name,email,password_hash) VALUES ($1,$2,$3)
 		RETURNING id::text,name,email,created_at`, name, email, string(hash)).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return User{}, ErrEmailExists
 	}
-	return u, err
+	if err != nil {
+		return User{}, err
+	}
+	if birthDate != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO user_profiles(user_id,birth_date) VALUES($1,$2)`, u.ID, date); err != nil {
+			return User{}, err
+		}
+	}
+	return u, tx.Commit(ctx)
 }
 
 func (s *Service) Login(ctx context.Context, email, password string) (User, string, time.Time, error) {

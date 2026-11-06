@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"newsChat/api/internal/contactguard"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,7 @@ type Conversation struct {
 }
 
 type Message struct {
+	ImageURL        string    `json:"image_url,omitempty"`
 	Kind            string    `json:"kind,omitempty"`
 	AudioURL        string    `json:"audio_url,omitempty"`
 	DurationMS      int       `json:"duration_ms,omitempty"`
@@ -67,6 +69,9 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 		return Conversation{}, err
 	}
 	defer tx.Rollback(context.Background())
+	if err = contactguard.LockUsers(ctx, tx, userID, peerID); err != nil {
+		return Conversation{}, err
+	}
 	var peer PublicUser
 	err = tx.QueryRow(ctx, "SELECT id::text,name,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE id=$1 FOR KEY SHARE", peerID).Scan(&peer.ID, &peer.Name, &peer.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -89,15 +94,18 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 	if err != nil {
 		return c, err
 	}
+	if _, err = tx.Exec(ctx, `UPDATE conversation_members SET hidden=false WHERE conversation_id=$1 AND user_id=$2`, c.ID, userID); err != nil {
+		return c, err
+	}
 	c.Participant = peer
 	return c, tx.Commit(ctx)
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>m.last_read_id AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
-        WHERE m.user_id=$1 AND ($2::bigint=0 OR c.position<$2)
+        WHERE m.user_id=$1 AND NOT m.hidden AND ($2::bigint=0 OR c.position<$2)
         ORDER BY c.position DESC LIMIT $3`, userID, before, limit)
 	if err != nil {
 		return nil, err
@@ -131,7 +139,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 		return nil, err
 	}
 	rows, err := s.db.Query(ctx, `SELECT id::text,conversation_id::text,COALESCE(sender_id::text,''),client_message_id::text,body,created_at,CASE WHEN kind<>'text' THEN kind ELSE '' END,COALESCE(duration_ms,0)
-        FROM messages WHERE conversation_id=$1 AND ($2::bigint=0 OR id<$2) ORDER BY id DESC LIMIT $3`, conversationID, before, limit)
+        FROM messages WHERE conversation_id=$1 AND id>(SELECT cleared_through FROM conversation_members WHERE conversation_id=$1 AND user_id=$4) AND ($2::bigint=0 OR id<$2) ORDER BY id DESC LIMIT $3`, conversationID, before, limit, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +152,9 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 		}
 		if m.Kind == "voice" {
 			m.AudioURL = "/api/messages/" + m.ID + "/audio"
+		}
+		if m.Kind == "image" {
+			m.ImageURL = "/api/messages/" + m.ID + "/image"
 		}
 		result = append(result, m)
 	}
@@ -159,7 +170,7 @@ func (s *Store) Send(ctx context.Context, conversationID, userID, clientID, body
 		return Message{}, false, err
 	}
 	defer tx.Rollback(context.Background())
-	if _, err = tx.Exec(ctx, "SELECT id FROM conversations WHERE id=$1 FOR UPDATE", conversationID); err != nil {
+	if err = lockSending(ctx, tx, conversationID, userID); err != nil {
 		return Message{}, false, err
 	}
 	var m Message
@@ -181,6 +192,9 @@ func (s *Store) Send(ctx context.Context, conversationID, userID, clientID, body
 	}
 	if err != nil {
 		return m, false, err
+	}
+	if err = checkMessageVisible(ctx, tx, conversationID, userID, m.ID); err != nil {
+		return Message{}, false, err
 	}
 	return m, false, tx.Commit(ctx)
 }

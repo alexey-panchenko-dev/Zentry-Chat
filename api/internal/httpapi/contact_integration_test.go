@@ -123,10 +123,20 @@ func TestContactProfilePrivacyAndEditing(t *testing.T) {
 	if string(persisted["phone"]) != `"+77771234567"` || string(persisted["show_phone"]) != "false" {
 		t.Fatalf("invalid edit replaced saved contact %s", persisted)
 	}
-	request(1, "POST", own, `{"phone":"+77771234567","show_phone":true,"show_email":true}`, 200)
+	privateSaved := request(1, "POST", own, `{"phone":"+77771234567","show_phone":true,"show_email":true}`, 200)
+	if string(privateSaved["show_email"]) != "false" || string(privateSaved["email"]) != fmt.Sprintf("%q", users[1].Email) {
+		t.Fatalf("login email privacy/owner response wrong %s", privateSaved)
+	}
 	visible := profile()
-	if string(visible["phone"]) != `"+77771234567"` || string(visible["email"]) != fmt.Sprintf("%q", users[1].Email) {
-		t.Fatalf("opt-in missing %s", visible)
+	if string(visible["phone"]) != `"+77771234567"` {
+		t.Fatalf("phone opt-in missing %s", visible)
+	}
+	if _, leaked := visible["email"]; leaked {
+		t.Fatalf("login email exposed to peer despite privacy override: %s", visible)
+	}
+	ownerAfterOptIn := request(1, "GET", own, "", 200)
+	if string(ownerAfterOptIn["show_email"]) != "false" || string(ownerAfterOptIn["email"]) != fmt.Sprintf("%q", users[1].Email) {
+		t.Fatalf("owner login email wrong %s", ownerAfterOptIn)
 	}
 	request(1, "POST", own, `{"phone":"+77771234567","show_phone":true,"show_email":true,"email":"attacker@example.com"}`, 400)
 	current, e := service.CurrentUser(ctx, tokens[1])

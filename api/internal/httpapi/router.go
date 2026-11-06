@@ -21,6 +21,8 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	}
 	ch := &chatHandlers{store: chat.New(db), auth: h.service, publisher: publisher}
 	chatMux := http.NewServeMux()
+	chatMux.HandleFunc("GET /api/conversations/{id}/controls", ch.signedIn(ch.getControls))
+	chatMux.HandleFunc("POST /api/conversations/{id}/controls", ch.signedIn(ch.changeControls))
 	chatMux.HandleFunc("GET /api/profile/contact", ch.signedIn(ch.getContactSettings))
 	chatMux.HandleFunc("POST /api/profile/contact", ch.signedIn(ch.setContactSettings))
 	chatMux.HandleFunc("GET /api/conversations/{id}/profile", ch.signedIn(ch.getContactProfile))
@@ -33,6 +35,8 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/conversations/{id}/read", ch.signedIn(ch.readState))
 	chatMux.HandleFunc("POST /api/conversations/{id}/read", ch.signedIn(ch.markRead))
 	chatMux.HandleFunc("POST /api/conversations/{id}/voice", ch.signedIn(ch.sendVoice))
+	chatMux.HandleFunc("POST /api/conversations/{id}/images", ch.signedIn(ch.sendImage))
+	chatMux.HandleFunc("GET /api/messages/{messageID}/image", ch.signedIn(ch.messageImage))
 	chatMux.HandleFunc("GET /api/messages/{messageID}/audio", ch.signedIn(ch.audio))
 	chatMux.HandleFunc("POST /api/profile/photo", ch.signedIn(ch.setPhoto))
 	chatMux.HandleFunc("DELETE /api/profile/photo", ch.signedIn(ch.deletePhoto))

@@ -222,6 +222,8 @@ func callID(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 func callFailure(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, calls.ErrBlocked):
+		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
 	case errors.Is(err, calls.ErrNotFound):
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
 	case errors.Is(err, calls.ErrBusy):

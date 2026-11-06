@@ -36,7 +36,7 @@ function VideoStream({ stream, muted = false, label, user }: { stream: MediaStre
     </div>
   </div>
 }
-export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange, requestCall }: { requestCall?:ProfileCallRequest|null; onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
+export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange, requestCall, contactBlocked=false }: { contactBlocked?:boolean; requestCall?:ProfileCallRequest|null; onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
   const callDialog = useRef<HTMLDialogElement>(null)
   const [sounds] = useState(()=>new CallSounds({enabled:soundsEnabled}))
   const [soundBlocked,setSoundBlocked] = useState(false)
@@ -64,14 +64,14 @@ export function CallPanel({ user, selected, conversations = [], soundsEnabled = 
   const ongoing = call?.status === 'ringing' || call?.status === 'accepted'
   useEffect(()=>{onActiveChange?.(!!ongoing || view.busy);return()=>onActiveChange?.(false)},[ongoing,view.busy,onActiveChange])
   const [profileCallGate]=useState(()=>new CallRequestGate())
-  useEffect(()=>{const target=profileCallGate.consume(requestCall,!!ongoing||view.busy);if(target)void controller.current?.start(target)},[requestCall,ongoing,view.busy,profileCallGate])
+  useEffect(()=>{const target=profileCallGate.consume(requestCall,!!ongoing||view.busy||contactBlocked);if(target)void controller.current?.start(target)},[requestCall,ongoing,view.busy,profileCallGate,contactBlocked])
   const incoming = call?.callee_id === user.id
   useEffect(()=>{let active=true;if(call?.status==='ringing'&&soundsEnabled){const audible=sounds.play(incoming?'incoming':'outgoing');void Promise.resolve(audible).then(ok=>{if(active)setSoundBlocked(!ok)})}else sounds.stop();return()=>{active=false;sounds.stop()}},[call?.id,call?.status,incoming,soundsEnabled,sounds])
   const callPeer = call ? conversations.find(c => c.id === call.conversation_id)?.participant : selected?.participant
   useEffect(() => { const dialog=callDialog.current; if(ongoing && dialog && !dialog.open)dialog.showModal(); if(!ongoing && dialog?.open)dialog.close() },[ongoing])
   const names: Record<string, string> = { ringing: incoming ? 'Входящий звонок' : 'Вызываем собеседника…', accepted: 'Звонок', ended: 'Звонок завершён', cancelled: 'Вызов отменён', rejected: 'Вызов отклонён', expired: 'Время звонка истекло' }
   return <section className={'z-call-panel '+(ongoing?'is-ongoing':'is-idle')+(!selected&&!ongoing?' no-peer':'')} aria-label="Звонки">
-    {!ongoing && <><button className="z-call-launch z-icon" title={selected?'Позвонить: '+selected.participant.name:'Выберите переписку'} aria-label="Позвонить" disabled={!selected||view.busy} onClick={()=>selected&&void controller.current?.start(selected.id)}><Phone size={23}/></button>{view.error&&<p className="notice z-call-idle-error" role="alert">{view.error}</p>}</>}
+    {!ongoing && <><button className="z-call-launch z-icon" title={selected?'Позвонить: '+selected.participant.name:'Выберите переписку'} aria-label="Позвонить" disabled={!selected||view.busy||contactBlocked} onClick={()=>selected&&void controller.current?.start(selected.id)}><Phone size={23}/></button>{view.error&&<p className="notice z-call-idle-error" role="alert">{view.error}</p>}</>}
     {ongoing&&<dialog className="z-call-dialog" aria-label="Звонок" ref={callDialog} onCancel={e=>e.preventDefault()}><div className="z-call-stage"><div className="z-call-top"><Avatar user={callPeer||{id:'caller',name:incoming?'Входящий звонок':user.name}}/><div><h2>{call?names[call.status]??call.status:'Звонок'}</h2><p role="status">{view.connection}</p></div></div>
       <div className="z-call-feedback">
       {view.error&&<p className="notice" role="alert">{view.error}</p>}
