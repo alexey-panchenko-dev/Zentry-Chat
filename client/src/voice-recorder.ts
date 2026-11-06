@@ -34,7 +34,9 @@ export class VoiceRecorder {
    this.started=this.env.now();recorder.start(250);this.emit({phase:'recording'});this.timer=this.env.setTimer(()=>this.stop(),120000)
   }catch{if(generation===this.generation&&!this.disposed){this.release();this.emit({phase:'error',error:'Нет доступа к микрофону. Разрешите доступ в настройках браузера и повторите.'})}}
  }
- stop(){if(this.recorder?.state==='recording'){this.recorder.stop();this.release()}}
+ // stop() flushes its last chunk asynchronously. Keep the source alive until
+ // onstop handles that chunk; cancel/dispose still release it immediately.
+ stop(){if(this.recorder?.state==='recording')this.recorder.stop()}
  cancel(){++this.generation;this.release();if(this.recorder?.state==='recording')this.recorder.stop();this.recorder=undefined;if(this.state.draft)this.env.revokeURL(this.state.draft.url);this.emit({phase:'idle'})}
  dispose(){this.disposed=true;this.cancel()}
 }

@@ -23,12 +23,12 @@ test('delayed stop from cancelled recorder cannot stop a newer microphone',async
  class AsyncRecorder{static isTypeSupported(){return true};state='inactive';mimeType='audio/webm';constructor(){instances.push(this)}start(){this.state='recording'}stop(){this.state='inactive'}finish(){this.ondataavailable?.({data:new Blob(['old recording'])});this.onstop?.()}}
  const env={getMedia:async()=>{const track={stopped:false,stop(){this.stopped=true}};tracks.push(track);return {getTracks:()=>[track]}},Recorder:AsyncRecorder,createURL:()=> 'blob:test',revokeURL:()=>{},now:()=>1000,setTimer:()=>1,clearTimer:()=>{},uuid:()=> 'id'}
  const recorder=new VoiceRecorder(next=>state=next,env)
- await recorder.start();recorder.stop();assert.ok(tracks[0].stopped);recorder.cancel();await recorder.start();instances[0].finish();assert.equal(tracks[1].stopped,false);assert.equal(state.phase,'recording');recorder.dispose();assert.ok(tracks[1].stopped)
+ await recorder.start();recorder.stop();recorder.cancel();assert.ok(tracks[0].stopped);await recorder.start();instances[0].finish();assert.equal(tracks[1].stopped,false);assert.equal(state.phase,'recording');recorder.dispose();assert.ok(tracks[1].stopped)
 })
 test('stopping waits for the final chunk before offering preview',async()=>{
  let instance;let state
  class AsyncRecorder{static isTypeSupported(){return true};state='inactive';mimeType='audio/webm';constructor(){instance=this}start(){this.state='recording'}stop(){this.state='inactive'}}
  const track={stopped:false,stop(){this.stopped=true}}
  const recorder=new VoiceRecorder(next=>state=next,{getMedia:async()=>({getTracks:()=>[track]}),Recorder:AsyncRecorder,createURL:()=> 'blob:test',revokeURL:()=>{},now:()=>1000,setTimer:()=>1,clearTimer:()=>{},uuid:()=> 'id'})
- await recorder.start();recorder.stop();assert.ok(track.stopped);assert.equal(state.draft,undefined);instance.ondataavailable({data:new Blob(['final'])});instance.onstop();assert.equal(state.phase,'preview');assert.equal(await state.draft.blob.text(),'final');recorder.dispose()
+ await recorder.start();recorder.stop();assert.equal(track.stopped,false,'capture must remain available until the recorder flushes its final data');assert.equal(state.draft,undefined);instance.ondataavailable({data:new Blob(['final'])});instance.onstop();assert.ok(track.stopped);assert.equal(state.phase,'preview');assert.equal(await state.draft.blob.text(),'final');recorder.dispose()
 })
