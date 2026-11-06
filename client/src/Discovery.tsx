@@ -35,14 +35,13 @@ function ProfileForm({ profile }: {profile: Profile}) {
   const [name, setName] = useState(profile.name)
   const [birthDate,setBirthDate]=useState(formatBirthDate(profile.birth_date))
   const [bio, setBio] = useState(profile.bio)
-  const [city, setCity] = useState(profile.city)
   const [validation,setValidation]=useState<{field:string;message:string}|null>(null)
   const form=useRef<HTMLFormElement>(null)
   let birthISO='';try{birthISO=parseBirthDate(birthDate)}catch{/* An incomplete draft is validated on save. */}
   const age=birthISO?ageFromBirthDate(birthISO):profile.age
   const birthday=birthISO?birthdayLabel(birthISO.slice(5)):null
   const save = useMutation({
-    mutationFn: async () => (await api.put<{profile: Profile}>('/profile', {name,birth_date:parseBirthDate(birthDate),bio,city})).data.profile,
+    mutationFn: async () => (await api.put<{profile: Profile}>('/profile', {name,birth_date:parseBirthDate(birthDate),bio,city:profile.city})).data.profile,
     onSuccess: next => {
       cache.setQueryData(['profile'], next)
       cache.setQueryData(['session'], (old: User) => ({...old, name: next.name}))
@@ -56,7 +55,6 @@ function ProfileForm({ profile }: {profile: Profile}) {
     if(!name.trim()||Array.from(name).length>100)invalid={field:'name',message:'Введите имя от 1 до 100 символов.'}
     if(!invalid){try{parseBirthDate(birthDate)}catch(e){invalid={field:'birth_date',message:errorText(e)}}}
     if(!invalid&&Array.from(bio).length>100)invalid={field:'bio',message:'Описание должно быть не длиннее 100 символов.'}
-    if(!invalid&&Array.from(city).length>100)invalid={field:'city',message:'Город должен быть не длиннее 100 символов.'}
     setValidation(invalid);if(invalid){form.current?.querySelector<HTMLElement>('[name="'+invalid.field+'"]')?.focus();return}save.mutate()
   }
   return <form ref={form} noValidate className="z-profile-form" onSubmit={submit}>
@@ -65,13 +63,19 @@ function ProfileForm({ profile }: {profile: Profile}) {
     <p id="birth-date-help" className="z-field-help">Год рождения виден только вам. Возраст рассчитывается автоматически; собеседникам показываются день и месяц.</p>
     {age!=null&&<p className="z-muted">Возраст: {age}{birthday&&<> · День рождения: {birthday.label}{birthday.today?' · Сегодня 🎉':''}</>}</p>}
     <label>О себе<textarea name="bio" className="resize-none" value={bio} onChange={e=>setBio(e.target.value)} rows={3} aria-invalid={validation?.field==='bio'} aria-describedby={validation?.field==='bio'?'profile-validation':'bio-help'} /><small id="bio-help">{Array.from(bio).length}/100 символов</small></label>
-    <label>Город <small>необязательно</small><input name="city" maxLength={100} value={city} aria-invalid={validation?.field==='city'} aria-describedby={validation?.field==='city'?'profile-validation':undefined} onChange={e=>setCity(e.target.value)} /></label>
     {validation&&<p id="profile-validation" className="notice" role="alert">{validation.message}</p>}
     {save.isError&&<p className="notice" role="alert">{errorText(save.error)}</p>}
     {save.isSuccess&&<p role="status">Профиль сохранён.</p>}
     {!birthDatesReady&&<p className="notice" role="status">{health.isPending?'Проверяем доступность сохранения…':'Сохранение профиля с датой рождения временно недоступно. Попробуйте позже.'}</p>}
     <button className="primary" disabled={save.isPending||!birthDatesReady}>Сохранить профиль</button>
   </form>
+}
+
+function DiscoveryCity({profile}:{profile:Profile}) {
+  const cache=useQueryClient()
+  const [city,setCity]=useState(profile.city)
+  const save=useMutation({mutationFn:async()=> (await api.put<{profile:Profile}>('/profile',{name:profile.name,birth_date:profile.birth_date,bio:profile.bio,city:city.trim()})).data.profile,onSuccess:next=>{cache.setQueryData(['profile'],next);void cache.invalidateQueries({queryKey:['discovery']})}})
+  return <form className="z-discovery-city" onSubmit={event=>{event.preventDefault();if(!save.isPending)save.mutate()}}><label>Мой город<input value={city} maxLength={100} placeholder="Указать город" onChange={event=>setCity(event.target.value)}/></label><button className="secondary" disabled={save.isPending||city.trim()===profile.city} type="submit">Сохранить</button>{save.isError&&<p className="notice" role="alert">{errorText(save.error)}</p>}{save.isSuccess&&<p role="status">Город сохранён.</p>}</form>
 }
 
 export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => void; fallbackInterval: number | false }) {
@@ -101,6 +105,7 @@ export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => 
   return <section className="z-discovery"><header className="z-discovery-header"><h1><Heart/> Знакомства</h1>
     {ready&&<div className="z-discovery-tabs"><button className={tab==='cards'?'is-active':''} onClick={()=>{setTab('cards');setExpanded(null)}}>Люди</button><button className={tab==='likes'?'is-active':''} onClick={()=>{setTab('likes');setExpanded(null)}}>Входящие лайки</button></div>}
     </header><div className="z-discovery-content">
+    {profile.data&&<DiscoveryCity key={profile.data.id} profile={profile.data}/>}
     {profile.isPending?<p role="status">Загружаем профиль…</p>:profile.isError?<p className="notice">{errorText(profile.error)}</p>:!ready?<div className="z-discovery-empty"><Heart size={32} aria-hidden="true"/><h2>Расскажи немного о себе</h2><p>Добавь дату рождения и описание,<br/>чтобы знакомиться.</p><button className="primary" onClick={onSettings}>Заполнить профиль</button></div>:<>
       {match&&<p role="status">{match}</p>}{vote.isError&&<p className="notice" role="alert">{errorText(vote.error)}</p>}
       {active.isPending&&<p role="status">Загружаем карточки…</p>}{active.isError&&<p className="notice">{errorText(active.error)}</p>}

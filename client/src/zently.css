@@ -164,3 +164,17 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-group-create .z-contact-dialog-head{border-bottom:1px solid #ff77ba20;padding-bottom:12px}.z-group-create .z-group-name input{background:linear-gradient(140deg,#2a202b,#1e1922);border:1px solid #ff77ba2e;box-shadow:inset 0 1px 0 #ffffff0e}.z-group-create .z-group-name input:focus-visible{border-color:#ff56ad;box-shadow:0 0 0 3px #ff14931a}
 .z-group-create .z-group-pick{background:linear-gradient(110deg,#2a202bba,#1a171fbd);border-color:#ffffff10;transition:border-color .16s ease,background .16s ease}.z-group-create .z-group-pick:hover{border-color:#ff70b84d;background:#ff149313}.z-group-create .z-group-pick.is-picked{background:linear-gradient(105deg,#6a123d78,#2b1b2ac9);border-color:#ff4eaa;box-shadow:inset 3px 0 0 #ff1493,0 0 14px #ff14931a}
 @media(prefers-reduced-motion:reduce){.z-group-create .z-group-pick{transition:none}}
+
+/* The same quiet ambient canvas continues through the remaining app surfaces. */
+.z-workspace,.z-settings,.z-discovery,.z-auth-page{background-color:#100b13;background-image:radial-gradient(ellipse 60% 45% at 7% 22%,#ff149326,transparent 74%),radial-gradient(ellipse 55% 50% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 65% 55% at 75% 8%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%;background-repeat:no-repeat}
+.z-auth-card,.z-contact-dialog,.z-call-dialog{background-color:#151018;background-image:radial-gradient(ellipse 75% 42% at 8% 5%,#ff149322,transparent 78%),radial-gradient(ellipse 65% 42% at 95% 95%,#b7ff390d,transparent 80%),linear-gradient(155deg,#1c141e,#110d14 65%,#151017);border-color:#ff149342}
+.z-group-create{border-color:#ff149359}
+.z-group-create .primary:disabled{opacity:.38;filter:saturate(.25);box-shadow:none}
+.z-photo-picker:hover:not(:disabled){outline:none}
+.z-photo-picker .z-avatar.is-large,.z-photo-picker .z-photo-preview{border-radius:50%}
+.z-photo-plus{right:7px;bottom:7px;width:30px;height:30px;border:1px solid #ffffff30;background:#211a25df;color:#fff;box-shadow:0 2px 12px #0008;opacity:0;transform:scale(.9);transition:opacity .16s ease,transform .16s ease}
+.z-photo-plus svg{width:16px;height:16px}
+.z-photo-picker:hover:not(:disabled) .z-photo-plus,.z-photo-picker:focus-visible .z-photo-plus{opacity:1;transform:scale(1)}
+.z-photo-picker:focus-visible{outline:2px solid var(--z-lime);outline-offset:4px}
+@media(hover:none){.z-photo-plus{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.z-photo-plus{transition:none}}
