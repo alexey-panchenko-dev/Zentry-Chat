@@ -3,7 +3,9 @@ package httpapi
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
+	"image/color"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -258,5 +260,80 @@ func TestWebMManyStreamingUnknownClusters(t *testing.T) {
 	}
 	if err := validateAudio("audio/webm", result); err != nil {
 		t.Fatalf("eight legal streaming Clusters rejected: %v", err)
+	}
+}
+
+func TestProfilePhotoCenterCrop(t *testing.T) {
+	for _, size := range []image.Point{{X: 7, Y: 12}, {X: 12, Y: 7}} {
+		for _, format := range []string{"png", "jpeg"} {
+			t.Run(fmt.Sprintf("%s-%dx%d", format, size.X, size.Y), func(t *testing.T) {
+				photo := image.NewNRGBA(image.Rect(0, 0, size.X, size.Y))
+				for y := 0; y < size.Y; y++ {
+					for x := 0; x < size.X; x++ {
+						photo.SetNRGBA(x, y, color.NRGBA{R: uint8(15 * x), G: uint8(15 * y), B: 90, A: 255})
+					}
+				}
+				var input bytes.Buffer
+				var err error
+				if format == "png" {
+					err = png.Encode(&input, photo)
+				} else {
+					err = jpeg.Encode(&input, photo, nil)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				original, _, err := image.Decode(bytes.NewReader(input.Bytes()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				stored, mime, err := normalizePhoto(input.Bytes())
+				if err != nil {
+					t.Fatal(err)
+				}
+				cropped, err := png.Decode(bytes.NewReader(stored))
+				if err != nil {
+					t.Fatal(err)
+				}
+				side := min(size.X, size.Y)
+				if mime != "image/png" || cropped.Bounds().Dx() != side || cropped.Bounds().Dy() != side {
+					t.Fatalf("expected square %d got %v %s", side, cropped.Bounds(), mime)
+				}
+				origin := image.Pt((size.X-side)/2, (size.Y-side)/2)
+				for _, p := range []image.Point{{X: 0, Y: 0}, {X: side - 1, Y: side - 1}} {
+					want := color.NRGBAModel.Convert(original.At(p.X+origin.X, p.Y+origin.Y))
+					got := color.NRGBAModel.Convert(cropped.At(p.X, p.Y))
+					if got != want {
+						t.Fatalf("crop pixel %v got %v want %v", p, got, want)
+					}
+				}
+			})
+		}
+	}
+}
+func TestProfilePhotoCropPreservesTransparencyAndDimensionLimit(t *testing.T) {
+	photo := image.NewNRGBA(image.Rect(0, 0, 2, 4))
+	photo.SetNRGBA(0, 1, color.NRGBA{R: 80, G: 120, B: 160, A: 64})
+	var input bytes.Buffer
+	if err := png.Encode(&input, photo); err != nil {
+		t.Fatal(err)
+	}
+	b, _, err := normalizePhoto(input.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cropped, err := png.Decode(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cropped.Bounds() != image.Rect(0, 0, 2, 2) || color.NRGBAModel.Convert(cropped.At(0, 0)) != photo.NRGBAAt(0, 1) {
+		t.Fatalf("transparent crop changed bounds/pixel %v %v", cropped.Bounds(), cropped.At(0, 0))
+	}
+	input.Reset()
+	if err = png.Encode(&input, image.NewNRGBA(image.Rect(0, 0, 4097, 1))); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = normalizePhoto(input.Bytes()); err == nil {
+		t.Fatal("oversized dimensions must be rejected before crop")
 	}
 }

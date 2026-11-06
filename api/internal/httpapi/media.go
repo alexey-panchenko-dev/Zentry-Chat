@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/draw"
 	_ "image/jpeg"
 	"image/png"
 	"io"
@@ -44,6 +45,13 @@ func normalizePhoto(b []byte) ([]byte, string, error) {
 	img, _, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
 		return nil, "", err
+	}
+	if bounds := img.Bounds(); bounds.Dx() != bounds.Dy() {
+		side := min(bounds.Dx(), bounds.Dy())
+		origin := bounds.Min.Add(image.Pt((bounds.Dx()-side)/2, (bounds.Dy()-side)/2))
+		square := image.NewNRGBA(image.Rect(0, 0, side, side))
+		draw.Draw(square, square.Bounds(), img, origin, draw.Src)
+		img = square
 	}
 	var out bytes.Buffer
 	if err = png.Encode(&out, img); err != nil {
