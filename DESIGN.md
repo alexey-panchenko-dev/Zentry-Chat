@@ -24,3 +24,5 @@ Auth and search forms own localized inline validation with first-invalid-field f
 The single composer surface contains the idle microphone beside the text draft and send button. Recording/requesting/preview replace the text controls within that surface; the mounted text input retains its draft and returns after send/cancel. Voice preview has only its own send action.
 
 MediaAvailability requires explicit authenticated server capability flags from /realtime/config before mounting voice/photo controls. Missing flags, old servers and lookup errors keep uploads/recording unavailable with a compact explanation; checks repeat every 30 seconds until supported. Text and call flows retain their existing behavior.
+
+Profile photos accept JPEG/PNG inputs up to 15 MiB. The browser prepares a proportional JPEG copy with longest edge at most 1024px, without upscaling, before upload. The stored upload stays below the existing 2 MiB server/database limit. Pending preparation disables upload controls; stale preparation results and temporary object URLs are released on replacement/unmount.

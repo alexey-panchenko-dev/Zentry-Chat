@@ -27,7 +27,7 @@ export function errorText(error: unknown): string {
     const labels: Record<string, string> = {
       invalid_media: 'Файл не подходит. Проверьте формат и размер и повторите.',
       invalid_voice: 'Не удалось принять запись. Запишите сообщение заново (до 2 минут и 3 МБ).',
-      invalid_photo: 'Не удалось принять фото. Выберите JPG или PNG до 2 МБ.',
+      invalid_photo: 'Не удалось сохранить фото. Выберите другой JPG или PNG.',
       invalid_credentials: 'Неверная почта или пароль.',
       email_already_registered: 'Эта почта уже зарегистрирована.',
       unauthorized: 'Сессия закончилась. Войдите снова.',
