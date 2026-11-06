@@ -143,3 +143,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 /* Large ambient shapes add depth behind navigation without a repeating motif. */
 .z-sidebar{background-image:radial-gradient(ellipse 115% 38% at 12% 2%,#ff149323,transparent 78%),radial-gradient(ellipse 110% 28% at 90% 94%,#b7ff390f,transparent 78%),linear-gradient(160deg,#1b121c 0%,#110d14 42%,#0d0c11 100%)}
 .z-dialogs{background-image:radial-gradient(ellipse 110% 34% at 92% 0%,#ff149325,transparent 78%),radial-gradient(ellipse 100% 30% at -25% 95%,#b7ff3910,transparent 78%),linear-gradient(170deg,#1b131c 0%,#120e15 47%,#0d0c11 100%)}
+
+/* Match the approved chat canvas across navigation surfaces. */
+.z-sidebar,.z-dialogs{background-color:#100b13;background-image:radial-gradient(ellipse 95% 45% at 7% 8%,#ff149326,transparent 74%),radial-gradient(ellipse 85% 48% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 95% 50% at 82% 0%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%;background-repeat:no-repeat}
