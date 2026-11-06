@@ -1,0 +1,5 @@
+CREATE TABLE group_chats(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),name text NOT NULL CHECK(char_length(name) BETWEEN 1 AND 80),owner_id uuid NOT NULL REFERENCES users(id),created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE group_members(group_id uuid NOT NULL REFERENCES group_chats(id) ON DELETE CASCADE,user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,joined_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(group_id,user_id));
+CREATE INDEX group_members_user_idx ON group_members(user_id,group_id);
+CREATE TABLE group_messages(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,group_id uuid NOT NULL REFERENCES group_chats(id) ON DELETE CASCADE,sender_id uuid NOT NULL,client_message_id uuid NOT NULL,body text NOT NULL CHECK(char_length(btrim(body)) BETWEEN 1 AND 1000),created_at timestamptz NOT NULL DEFAULT now(),FOREIGN KEY(group_id,sender_id) REFERENCES group_members(group_id,user_id),UNIQUE(sender_id,client_message_id));
+CREATE INDEX group_messages_history_idx ON group_messages(group_id,id DESC);

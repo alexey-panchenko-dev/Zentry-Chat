@@ -1,3 +1,5 @@
+import { GroupCreate, GroupView } from './Groups'
+import type { Group } from './Groups'
 import { useDeliveryReceipts } from './useDeliveryReceipts'
 import { messageStatus } from './message-status'
 import type { RemovalAction } from './conversation-controls'
@@ -23,7 +25,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { subscribeRealtime } from './realtime.ts'
 import { Discovery, ProfileEditor } from '@/Discovery'
 import { useReadReceipt } from './read-receipt.ts'
-import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Check, CheckCheck, Heart, ChevronsLeft } from 'lucide-react'
+import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Users, Check, CheckCheck, Heart, ChevronsLeft } from 'lucide-react'
 import { Brand, Avatar } from '@/Visual'
 import { api, errorText } from '@/api'
 import type { Conversation, Message, MessagePage, ReadState, User } from '@/api'
@@ -115,6 +117,11 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const cache = useQueryClient()
   useDeliveryReceipts(user.id)
   const [selected, setSelectedState] = useState<Conversation | null>(null)
+  const [selectedGroup,setSelectedGroup]=useState<Group|null>(null)
+  const [groupCreateOpen,setGroupCreateOpen]=useState(false)
+  const groupCapability=useQuery({queryKey:['media-capabilities'],queryFn:async()=> (await api.get<{media?:{groups?:boolean}}>('/realtime/config')).data,retry:false,staleTime:5*60_000})
+  const groupsSupported=groupCapability.data?.media?.groups===true
+  const groups=useQuery({enabled:groupsSupported,queryKey:['groups'],queryFn:async()=> (await api.get<{groups:Group[]}>('/groups')).data.groups,retry:false,refetchInterval:15000})
   const selectedRef=useRef<Conversation|null>(null)
   const [removalNotice,setRemovalNotice]=useState('')
   function setSelected(value:Conversation|null){selectedRef.current=value;setSelectedState(value)}
@@ -134,6 +141,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [realtimeReady, setRealtimeReady] = useState(false)
   const controls=useConversationControls(selected?.id,realtimeReady)
   useEffect(() => watchConversations(user.id, event => {
+    if(event.reason==='group'||event.reason==='connected'){void cache.invalidateQueries({queryKey:['groups']});if(event.reason==='group'){void cache.invalidateQueries({queryKey:['group-messages']});return}}
     if(event.reason==='discovery') {
       void cache.invalidateQueries({queryKey:['discovery']})
       return
@@ -163,7 +171,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   })
   const create = useMutation({
     mutationFn: async (id: string) => (await api.post<{ conversation: Conversation }>('/conversations', { user_id: id })).data.conversation,
-    onSuccess: (dialog) => { setSelected(dialog); setUiSection('chats'); setMobileChat(true); setSearchOpen(false); setQuery(''); setSearch(''); void cache.invalidateQueries({ queryKey: ['conversations'] }) },
+    onSuccess: (dialog) => { setSelectedGroup(null); setSelected(dialog); setUiSection('chats'); setMobileChat(true); setSearchOpen(false); setQuery(''); setSearch(''); void cache.invalidateQueries({ queryKey: ['conversations'] }) },
   })
   const logout = useMutation({
     mutationFn: () => api.post('/auth/logout', {}),
@@ -181,26 +189,28 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
       <button type="button" className="z-icon z-collapse" aria-label={compact?'Развернуть меню':'Свернуть меню'} aria-expanded={!compact} onClick={()=>setCompact(!compact)}><ChevronsLeft size={18}/></button>
       <button className="z-account" aria-label="Мой профиль" onClick={()=>{setUiSection('profile');setMobileChat(true)}}><Avatar user={user}/><span><strong>{user.name}</strong><small>Мой профиль</small></span></button>
     </aside>
-    <aside className="z-dialogs"><div className="z-list-top"><span>Чаты</span><div><button className="z-icon" aria-label="Обновить переписки" onClick={()=>void dialogs.refetch()}><RefreshCw size={16}/></button><button className="z-icon" aria-label="Найти человека" onClick={()=>setSearchOpen(!searchOpen)}><Plus/></button></div></div>
+    <aside className="z-dialogs"><div className="z-list-top"><span>Чаты</span><div><button className="z-icon" aria-label="Обновить переписки" onClick={()=>void dialogs.refetch()}><RefreshCw size={16}/></button>{groupsSupported&&<button className="z-icon" aria-label="Создать группу" title="Создать группу" onClick={()=>setGroupCreateOpen(true)}><Users size={20}/></button>}<button className="z-icon" aria-label="Найти человека" onClick={()=>setSearchOpen(!searchOpen)}><Plus/></button></div></div>
       <form noValidate className="z-search" onSubmit={(e)=>{e.preventDefault();const input=e.currentTarget.querySelector('input')!;const text=search.trim();if(!input.checkValidity()||text.length<2||text.length>100){setSearchError('Введите имя или почту от 2 до 100 символов.');input.focus();return}setSearchError('');setQuery(text);setSearchOpen(true)}}><Search size={18}/><input aria-invalid={!!searchError} aria-describedby={searchError?'search-validation':undefined} aria-label="Поиск пользователя" placeholder="Имя или точная почта" value={search} onChange={e=>{setSearch(e.target.value);setSearchError('')}} minLength={2} maxLength={100} required/>{search && <button type="button" className="z-clear" aria-label="Очистить поиск" onClick={()=>{setSearch('');setQuery('');setSearchError('')}}>×</button>}<button className="z-icon" aria-label="Найти"><ArrowLeft size={16} className="z-arrow-forward"/></button></form>
       {searchError&&<p id="search-validation" className="notice" role="alert">{searchError}</p>}
       {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}</span><MessageCircle size={17}/></button>)}</div>}
       {removalNotice&&<p className="z-field-help" role="status">{removalNotice}</p>}
       {create.isError&&<p className="notice">{errorText(create.error)}</p>}
-      <div className="z-conversation-list">{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
-        {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.participant.name}</strong><small>Открыть переписку</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
+      <div className="z-conversation-list">{groups.data&&groups.data.length>0&&<><p className="z-list-label">Группы</p>{groups.data.map(group=><button key={group.id} className={'z-conversation'+(selectedGroup?.id===group.id?' is-selected':'')} onClick={()=>{setSelectedGroup(group);setSelected(null);setUiSection('chats');setMobileChat(true)}}><span className="z-group-avatar"><Users size={20}/></span><span><strong>{group.name}</strong><small>{group.member_count} участника</small></span></button>)}<p className="z-list-label">Личные чаты</p></>}{groups.isError&&<p className="notice">{errorText(groups.error)}</p>}{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
+        {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelectedGroup(null);setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.participant.name}</strong><small>Открыть переписку</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
         {dialogs.data?.pages[0].conversations.length===0&&<div className="z-empty-copy"><MessageCircle/><p>Твой круг начинается здесь.</p><small>Найди человека по имени или почте.</small></div>}
         {dialogs.hasNextPage&&<button className="secondary" disabled={dialogs.isFetchingNextPage} onClick={()=>void dialogs.fetchNextPage()}>Ещё переписки</button>}
       </div>
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
+      {selectedGroup&&<div className="z-message-view" hidden={uiSection!=='chats'}><GroupView key={selectedGroup.id} group={selectedGroup} user={user} onBack={()=>setMobileChat(false)}/></div>}
       {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive} realtimeReady={realtimeReady} controls={controls} onRemoved={conversationRemoved} onProfileCall={()=>setRequestCall({id:crypto.randomUUID(),conversationID:selected.id})}/></div>}
       {uiSection==='profile'?<section className="z-settings z-own-profile"><h1>Мой профиль</h1><div className="z-profile"><ProfilePhoto user={user}/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p></div><ProfileEditor user={user}/></section>:uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><MediaAvailability feature="contact_profiles"><ContactSettings/></MediaAvailability><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
       :uiSection==='discovery'?<Discovery fallbackInterval={realtimeReady?false:60_000} onSettings={()=>setUiSection('profile')}/>
       :uiSection==='calls'?<section className="z-call-lobby"><Phone size={40}/><h1>Ближе голосом</h1><p className="z-muted">{selected?'Начни видеозвонок с '+selected.participant.name:'Выбери переписку, чтобы позвонить.'}</p><p className="z-field-help">Кнопка звонка появится, когда выберешь собеседника.</p></section>
-      :!selected?<div className="z-empty"><MessageCircle size={46}/><h1>На одной волне</h1><p>Выбери разговор или найди человека,<br/>с которым хочешь быть на связи.</p></div>:null}
+      :!selected&&!selectedGroup?<div className="z-empty"><MessageCircle size={46}/><h1>На одной волне</h1><p>Выбери разговор или найди человека,<br/>с которым хочешь быть на связи.</p></div>:null}
     </div>
+    {groupCreateOpen&&<GroupCreate onClose={()=>setGroupCreateOpen(false)} onCreated={group=>{setGroupCreateOpen(false);setSelectedGroup(group);setSelected(null);setUiSection('chats');setMobileChat(true);void cache.invalidateQueries({queryKey:['groups']})}}/>}
     <CallPanel contactBlocked={controls.blocked||controls.unavailable} requestCall={requestCall} onActiveChange={setCallActive} user={user} selected={selected} soundsEnabled={soundsEnabled} conversations={dialogs.data?.pages.flatMap(page=>page.conversations)||[]}/>
   </div>
 }
