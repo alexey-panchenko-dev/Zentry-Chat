@@ -19,3 +19,10 @@ Voice messages: explicit audio-only recording, maximum 120 seconds/3 MiB, previe
 Fixture provenance: `api/internal/httpapi/testdata/README.md` records the temporary FFmpeg generator and commands for the four small synthetic encoded fixtures. Go tests require no FFmpeg installation. Parser scope is Opus WebM without lacing, Opus Ogg, and AAC/Opus MP4; codec payloads are not fully decoded.
 
 Live public-site check (2026-11-06): the root browser check of `https://zentrychat.vercel.app/` displayed “API недоступна”; login forms could not be reached. Bounded read-only fetches from this task to the Vercel health/auth routes and Render health endpoint all failed at the network layer, so no HTTP status or cold-start diagnosis is asserted. No deployment settings or credentials were changed.
+
+## Follow-up deployment verification (2026-11-06)
+The earlier API error is no longer reproducible: Vercel `/api/health` and Render `/api/health` plus `/api/ready` return 200; unauthenticated `/api/auth/me` returns the expected401. Browser checks now pass login/registration navigation, invalid/empty input feedback and390x844 layout. A nonexistent-account login correctly returns401 invalid_credentials; no production account was created.
+
+Git publication succeeded using Windows' normal saved Git credentials. The media branch is published to `alexey-panchenko-dev/Zentry-Chat`. Audio-only commit8999977 is in master and both Vercel statuses succeeded; the production client serves `index-DvtyCiX9.js` with the new audio diagnostics/playback lifecycle. Voice/photo controls are not in that deployed client yet.
+
+Media deployment remains ordered API-before-client: Render requires sign-in and has no available deployment key/hook in this environment. The user was asked to sign in to the open Render dashboard. The media branch remains separate until the updated server is ready; physical microphone and authenticated end-to-end checks remain pending.

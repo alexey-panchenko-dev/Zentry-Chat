@@ -52,4 +52,4 @@ Files: new voice recorder controller/tests, VoiceComposer.tsx, VoiceMessage.tsx,
 - Implementation and independent review completed; review fixes include versioned avatars, structural media validation, non-null voice database checks, and streaming WebM Cluster boundaries.
 - Real local PostgreSQL full uncached Go suite passed; client 24 tests, production build, lint, visual contract check, and strict UI audit passed.
 - Four synthetic FFmpeg-encoded fixtures cover Opus WebM/Ogg and normal/fragmented AAC MP4. They do not verify physical microphone capture or audible cross-device playback.
-- Local commit and transfer artifacts are prepared on the feature branch. Publishing to the correct GitHub repository remains blocked by a confirmed 403; no deployment is claimed.
+- Media feature branch published successfully using Windows' saved Git credentials. Audio-only8999977 is in master and verified deployed by Vercel status and production asset. Media release waits for Render sign-in and server deployment before client promotion. Anonymous production flows now pass; authenticated/media physical-device checks remain pending.
