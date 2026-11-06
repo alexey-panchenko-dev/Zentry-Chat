@@ -179,3 +179,14 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-photo-picker:focus-visible{outline:2px solid var(--z-lime);outline-offset:4px}
 @media(hover:none){.z-photo-plus{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.z-photo-plus{transition:none}}
+
+/* The composer floats on the shared chat canvas, with no separate footer panel. */
+.z-messages{position:relative}
+.z-messages>.z-message-scroll{padding-bottom:116px}
+.z-messages>.z-composer-region{position:absolute;left:0;right:0;bottom:0;z-index:2;background:none;border:0;box-shadow:none}
+.z-chat-header .z-connection{position:relative;flex:0 0 auto;padding:0}
+.z-chat-header .z-connection summary{width:35px;height:35px;display:grid;place-items:center;border-radius:12px;color:var(--z-muted)}
+.z-chat-header .z-connection summary:hover,.z-chat-header .z-connection[open] summary{background:#ffffff0b;color:var(--z-lime)}
+.z-connection-popover{position:absolute;top:42px;right:0;z-index:6;width:min(290px,calc(100vw - 45px));padding:12px 15px;border:1px solid #ff149342;border-radius:15px;background:#201721f2;box-shadow:0 16px 40px #0008;backdrop-filter:blur(20px);font-size:11px;line-height:1.6}
+.z-connection-popover p{margin:4px 0}
+@media(max-width:720px){.z-messages>.z-message-scroll{padding-bottom:106px}.z-chat-header .z-connection summary{width:28px;height:32px}.z-connection-popover{right:-30px}}
