@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Video, X } from 'lucide-react'
+import { Phone, X } from 'lucide-react'
 import { api, errorText } from '@/api'
 import type { Conversation, User } from '@/api'
 import { Avatar } from '@/Visual'
@@ -20,6 +20,6 @@ export function ContactProfile({conversation,onClose,onCall,callBusy=false}:{con
  {profile.isFetching&&<p role="status" className="z-muted">Загружаем профиль…</p>}
  {profile.isError&&<div role="alert"><p className="notice">{oldServer?'Дополнительные сведения профиля пока недоступны.':errorText(profile.error)}</p><button type="button" className="secondary" onClick={()=>void profile.refetch()} disabled={profile.isFetching}>Повторить</button></div>}
  {profile.data&&!profile.isFetching&&!profile.isError&&<><dl className="z-contact-details">{peer.phone&&<><dt>Телефон</dt><dd>{peer.phone}</dd></>}{peer.email&&<><dt>Почта</dt><dd>{peer.email}</dd></>}</dl>{!peer.phone&&!peer.email&&<p className="z-muted">Собеседник не открыл контактные данные.</p>}</>}
- <button type="button" className="primary" disabled={callBusy} onClick={()=>{close();onCall()}}><Video size={19}/>Видеозвонок</button>{callBusy&&<p className="z-field-help">Сначала завершите текущий звонок.</p>}
+ <button type="button" className="primary" disabled={callBusy} onClick={()=>{close();onCall()}}><Phone size={19}/>Позвонить</button>{callBusy&&<p className="z-field-help">Сначала завершите текущий звонок.</p>}
  </div></dialog>
 }

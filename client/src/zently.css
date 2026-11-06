@@ -1,4 +1,9 @@
 @font-face{font-family:Manrope;src:url('/assets/manrope.ttf') format('truetype');font-weight:200 800;font-display:swap}
+.z-unread{display:inline-grid;place-items:center;background:var(--z-pink);color:white;border-radius:50px;min-width:24px;height:24px;padding:0 6px;font-size:11px;flex-shrink:0;margin-left:auto}
+.z-conversation>span:not(.z-unread){min-width:0}.z-conversation .z-unread{flex:0 0 auto}
+.z-read-check{color:var(--z-lime)}.z-bubble-row.is-system{justify-content:center}.is-system .z-bubble{background:transparent;border:1px solid var(--z-line);text-align:center;color:var(--z-muted)}.is-system .z-message-meta{justify-content:center}
+.z-profile-form{display:grid;gap:16px;margin:20px 0 30px}.z-profile-form label{display:grid;gap:8px}.z-profile-form small{color:var(--z-muted)}
+@media(max-width:720px){.z-sidebar nav button{position:relative}.z-sidebar nav .z-unread{position:absolute;right:0;top:0;min-width:18px;height:18px;font-size:9px}}
 :root{color-scheme:dark;--z-bg:#0b090e;--z-surface:#141116;--z-card:#211c23;--z-line:#302530;--z-pink:#ff1493;--z-lime:#b7ff39;--z-text:#fff;--z-muted:#a6a0a9}
 *{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:#4c3a49 transparent}*::-webkit-scrollbar{width:6px;height:6px}*::-webkit-scrollbar-thumb{background:#4c3a49;border-radius:10px}
 body{margin:0;background:var(--z-bg);color:var(--z-text);font-family:Manrope,system-ui,sans-serif;font-size:14px}button,input,textarea{font:inherit}button{cursor:pointer;color:inherit}button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible,a:focus-visible{outline:2px solid var(--z-lime);outline-offset:3px}input,textarea{color:white;background:var(--z-card);border:1px solid var(--z-line);border-radius:17px;padding:16px;outline:none;width:100%}input:focus-visible,textarea:focus-visible{border-color:var(--z-lime);box-shadow:0 0 0 3px #b7ff3910}textarea{resize:none}input[type=checkbox]{accent-color:var(--z-lime);width:20px;height:20px}
@@ -61,3 +66,12 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .z-contact-details{align-self:stretch;margin:0}.z-contact-details dt{font-size:11px;color:var(--z-muted);margin-top:12px}.z-contact-details dd{margin:4px 0 0;overflow-wrap:anywhere}
 .z-contact-settings{display:grid;gap:12px;padding-block:24px;border-bottom:1px solid var(--z-line)}.z-contact-settings h2{font-size:18px;margin:0}.z-contact-settings>label:not(.z-setting-row){display:grid;gap:8px}.z-contact-settings .z-setting-row{margin:0}.z-contact-settings input[readonly]{color:var(--z-muted)}
 @media(max-width:720px){.z-header-profile{gap:8px}.z-header-profile strong{font-size:13px}.z-header-profile small{font-size:9px}.z-contact-dialog{padding:18px}}
+.z-conversation>span:nth-child(2){min-width:0;display:grid;gap:7px}
+.z-shell[data-ui-section=discovery] .z-call-panel.is-idle{display:none}
+.z-call-audio-avatar{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:90px 20px 160px}
+.z-call-audio-avatar strong{font-size:22px}.z-call-audio-avatar p{color:var(--z-muted);margin:0;font-size:13px}.z-call-audio-avatar .z-avatar.is-large{width:96px;height:96px;font-size:30px}
+.z-call-feedback{position:absolute;top:90px;left:20px;right:20px;z-index:8;display:grid;justify-items:start;gap:10px;max-height:calc(100% - 220px);overflow:auto;pointer-events:none}
+.z-call-feedback>*{pointer-events:auto}.z-call-feedback>.notice{max-width:420px;margin:0}.z-call-feedback .z-audio-diagnostics{position:static;max-width:290px;margin:0}
+.z-call-playback{bottom:110px;max-height:230px}.z-call-playback .z-audio-control{padding-top:0}.z-audio-alternate{background:none;border:0;color:var(--z-lime);font-size:11px;padding:10px 0 0;text-align:left;line-height:1.5}
+@media(max-width:720px){.z-call-playback{left:14px;bottom:100px;max-height:245px;width:calc(100% - 28px)}.z-call-playback .z-audio-details{display:none}}
+@media(max-width:720px){.z-call-feedback{top:82px;left:14px;right:14px}.z-call-feedback .z-audio-diagnostics{max-width:100%}}

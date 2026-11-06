@@ -107,6 +107,9 @@ func (h *chatHandlers) sendVoice(w http.ResponseWriter, r *http.Request, u auth.
 			delivery = "failed"
 		}
 	}
+	if members, err := h.store.Members(r.Context(), id); err == nil {
+		h.publishConversationUpdate("conversation.message", id, members...)
+	}
 	status := 200
 	if created {
 		status = 201

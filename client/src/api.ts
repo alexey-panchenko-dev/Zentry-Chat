@@ -8,12 +8,14 @@ export const api = axios.create({
 })
 
 export type User = { id: string; name: string; avatar_url?: string }
-export type Conversation = { id: string; participant: User }
+export type Conversation = { id: string; participant: User; unread_count?: number }
+export type Profile = User & { age: number | null; bio: string; city: string }
+export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string }
 export type Message = {
   id: string
   conversation_id: string
   sender_id: string
-  kind?: 'text' | 'voice'
+  kind?: 'text' | 'voice' | 'system'
   audio_url?: string
   duration_ms?: number
   body: string
@@ -25,6 +27,8 @@ export function errorText(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.error
     const labels: Record<string, string> = {
+      profile_required: 'Заполните возраст и описание в настройках профиля.',
+      invalid_profile: 'Проверьте профиль: имя обязательно, описание и город — до 100 символов, возраст — целое число лет.',
       invalid_media: 'Файл не подходит. Проверьте формат и размер и повторите.',
       invalid_voice: 'Не удалось принять запись. Запишите сообщение заново (до 2 минут и 3 МБ).',
       invalid_photo: 'Не удалось сохранить фото. Выберите другой JPG или PNG.',

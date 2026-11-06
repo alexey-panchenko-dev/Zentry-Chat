@@ -23,6 +23,7 @@ type testPublisher struct {
 	channel string
 	event   string
 	data    any
+	events  []string
 }
 
 func (p *testPublisher) Enabled() bool { return true }
@@ -31,6 +32,7 @@ func (p *testPublisher) PublicConfig() map[string]any {
 }
 func (p *testPublisher) Publish(channel, event string, data any) error {
 	p.calls++
+	p.events = append(p.events, channel+":"+event)
 	p.channel = channel
 	p.event = event
 	p.data = data
@@ -129,6 +131,12 @@ func TestChatAccessAndDelivery(t *testing.T) {
 	if conv.ID == "" || conv.Participant.ID != users[1].ID {
 		t.Fatal("incorrect conversation")
 	}
+	if publisher.calls != 2 || publisher.channel != "private-user-"+users[1].ID || publisher.event != "conversation.updated" {
+		t.Fatal("recipient was not notified about the committed dialog")
+	}
+	if data, ok := publisher.data.(map[string]string); !ok || data["conversation_id"] != conv.ID {
+		t.Fatal("incorrect conversation notification")
+	}
 	reverse := request(1, "POST", "/api/conversations", fmt.Sprintf(`{"user_id":%q}`, users[0].ID), 200)
 	var reverseConv chat.Conversation
 	_ = json.Unmarshal(reverse["conversation"], &reverseConv)
@@ -147,7 +155,7 @@ func TestChatAccessAndDelivery(t *testing.T) {
 	first := request(0, "POST", path, firstBody, 201)
 	var firstMessage chat.Message
 	_ = json.Unmarshal(first["message"], &firstMessage)
-	if string(first["realtime"]) != `"published"` || publisher.channel != "private-conversation-"+conv.ID || publisher.event != "message.created" {
+	if string(first["realtime"]) != `"published"` || !strings.Contains(strings.Join(publisher.events, "\n"), "private-conversation-"+conv.ID+":message.created") {
 		t.Fatal("event not published")
 	}
 	replay := request(0, "POST", path, firstBody, 200)

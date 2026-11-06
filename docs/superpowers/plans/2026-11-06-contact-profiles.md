@@ -47,3 +47,5 @@
 - [ ] State physical/authenticated browser verification limits honestly; don't call real contacts or publish their data during checks.
 
 Verification: full Go suite passes on real local PostgreSQL;32 client tests, build, lint, original API/signaling contract and strict UI audit pass. Independent reviewer confirmed membership/privacy SQL and existing call path before its final review stopped at an account usage limit; coordinator completed remaining source review and fixed client leading-zero validation and stale private detail display on refresh failure. Authenticated live-browser actions are not claimed verified.
+
+Merge verification: preserved upstream master0d61250 (discovery,read receipts,audio fixes), resolved router/App/CSS conflicts without changing its call engine. Both008 migrations coexist and pass realDB migration. All53client tests/build/lint and scopedsourcecontract pass; fullGo suite including upstream tests passes. StrictUIaudit reports2pre-existing upstreamDiscovery.tsx form/textarea findings; contact components have no new findings and upstreamDiscovery.tsx was preserved byte-for-byte. Profile-call label follows upstream audio-first behavior.
