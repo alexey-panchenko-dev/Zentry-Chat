@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ImagePlus, Send, X } from 'lucide-react'
+import { Plus, Send, X } from 'lucide-react'
 import { api, errorText } from '@/api'
 import type { Message } from '@/api'
 import { ImageDraftController } from './image-draft'
@@ -23,7 +23,7 @@ export function ImageComposer({conversationID,disabled,onSent,onActiveChange}:{c
  const pending=state.phase==='sending'
  return <div className="z-image-composer" data-active={active} data-error={!!state.error}>
  <input ref={input} hidden type="file" accept="image/jpeg,image/png" aria-label="Выбрать фото для сообщения" disabled={disabled||pending} onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file&&!disabled)void controller.current?.select(file)}}/>
- {!active&&<button type="button" className="z-icon" aria-label="Добавить фото" title="Добавить JPG или PNG до 15 МБ" disabled={disabled} onClick={()=>input.current?.click()}><ImagePlus size={21}/></button>}
+ {!active&&<button type="button" className="z-icon z-attach-photo" aria-label="Добавить фото" title="Добавить JPG или PNG до 15 МБ" disabled={disabled} onClick={()=>input.current?.click()}><Plus size={24}/></button>}
  {state.phase==='preparing'&&<><span role="status">Подготавливаем фото…</span><button type="button" className="z-icon" aria-label="Отменить фото" onClick={()=>controller.current?.cancel()}><X/></button></>}
  {state.draft&&<><img className="z-chat-photo-preview" src={state.draft.url} alt="Предпросмотр фото перед отправкой"/><div className="z-image-draft-actions"><button type="button" className="z-icon" aria-label={pending?'Отменить отправку фото':'Убрать фото'} onClick={()=>controller.current?.cancel()}><X/></button><button type="button" className="z-send" disabled={pending||disabled} aria-label={state.error?'Повторить отправку фото':'Отправить фото'} onClick={()=>{if(!disabled)void controller.current?.send()}}><Send size={20}/></button></div>{pending&&<span role="status">Отправляем фото…</span>}</>}
  {state.error&&<p className="notice" role="alert">{state.error}</p>}

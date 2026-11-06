@@ -108,3 +108,5 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 
 /* The profile lives outside the application so its content stays sharp. */
 body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
+
+.z-composer>.z-image-composer{order:-1}.z-attach-photo{width:48px;height:48px;flex-shrink:0;border-radius:50%;border:1px solid #ffffff24;background:linear-gradient(145deg,#ffffff17,#ffffff06);box-shadow:inset 0 1px 0 #ffffff20}
