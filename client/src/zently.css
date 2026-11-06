@@ -59,3 +59,8 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 
 .z-conversation>span:nth-child(2){min-width:0;display:grid;gap:7px}
 .z-shell[data-ui-section=discovery] .z-call-panel.is-idle{display:none}
+.z-call-audio-avatar{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:90px 20px 160px}
+.z-call-audio-avatar strong{font-size:22px}.z-call-audio-avatar p{color:var(--z-muted);margin:0;font-size:13px}.z-call-audio-avatar .z-avatar.is-large{width:96px;height:96px;font-size:30px}
+.z-call-feedback{position:absolute;top:90px;left:20px;right:20px;z-index:8;display:grid;justify-items:start;gap:10px;max-height:calc(100% - 220px);overflow:auto;pointer-events:none}
+.z-call-feedback>*{pointer-events:auto}.z-call-feedback>.notice{max-width:420px;margin:0}.z-call-feedback .z-audio-diagnostics{position:static;max-width:290px;margin:0}
+@media(max-width:720px){.z-call-feedback{top:82px;left:14px;right:14px}.z-call-feedback .z-audio-diagnostics{max-width:100%}}

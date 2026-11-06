@@ -9,10 +9,21 @@ export type CallView = {
   call: Call | null; local: MediaStream | null; remote: MediaStream | null
   connection: string; error: string; busy: boolean
   audio?: { sent: number; received: number; inputLevel: number | null; inputEnabled: boolean; inputMuted: boolean }
+  cameraBusy?: boolean
+  cameraError?: string
 }
 type Signal = { id: string; type: 'offer' | 'answer' | 'ice'; payload: RTCSessionDescriptionInit & RTCIceCandidateInit }
 const active = (call: Call | null) => call?.status === 'ringing' || call?.status === 'accepted'
 class MediaCancelled extends Error {}
+
+function deviceError(error: unknown, camera = false) {
+  const name = (error as { name?: string })?.name
+  const device = camera ? 'камере' : 'микрофону'
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') return new Error(`Разрешите доступ к ${device} в настройках браузера.`)
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return new Error(camera ? 'Камера не найдена. Можно продолжить разговор без видео.' : 'Микрофон не найден. Подключите его и повторите попытку.')
+  if (name === 'NotReadableError' || name === 'TrackStartError') return new Error(camera ? 'Камера недоступна или занята другим приложением.' : 'Микрофон недоступен или занят другим приложением.')
+  return new Error(camera ? 'Не удалось включить камеру. Можно продолжить разговор без видео.' : 'Не удалось включить микрофон. Проверьте устройство и разрешение браузера.')
+}
 
 export class CallController {
   view: CallView = { call: null, local: null, remote: null, connection: 'Подключаем канал звонков…', error: '', busy: false }
@@ -31,6 +42,9 @@ export class CallController {
   private outgoing: Promise<void> = Promise.resolve()
   private offerSent = false
   private cancelMedia?: () => void
+  private cancelCamera?: () => void
+  private generation = 0
+  private videoSender?: RTCRtpSender
   private finishing = false
 
   constructor(userID: string, update: (view: CallView) => void) { this.userID = userID; this.update = update }
@@ -78,20 +92,28 @@ export class CallController {
       do {
         this.rerun = false
         const old = this.view.call
+        const generation = this.generation
         if (active(old)) {
           const { data } = await api.get<{ call: Call }>('/calls/' + old!.id)
           if (this.disposed) return
+          if (this.view.call?.id !== old?.id || generation !== this.generation) { this.rerun = true; continue }
           this.apply(data.call)
         } else {
           const { data } = await api.get<{ calls: Call[] }>('/calls')
           if (this.disposed) return
+          if (this.view.call?.id !== old?.id || generation !== this.generation) { this.rerun = true; continue }
           if (data.calls[0]) this.apply(data.calls[0])
         }
         const call = this.view.call
         if (call?.status === 'accepted' && this.view.local) {
-          await this.ensurePeer(call)
-          await this.receive(call)
-          await this.inspectAudio()
+          const mediaGeneration = this.generation
+          try {
+            await this.ensurePeer(call)
+            await this.receive(call)
+            await this.inspectAudio()
+          } catch (error) {
+            if (mediaGeneration === this.generation) throw error
+          }
         }
       } while (this.rerun && !this.disposed)
     } catch (error) {
@@ -102,16 +124,29 @@ export class CallController {
 
   private async media() {
     if (this.view.local) return
-    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Камера доступна на localhost или HTTPS.')
+    if (!navigator.mediaDevices?.getUserMedia) throw new Error('Микрофон доступен на localhost или HTTPS.')
     const callID = this.view.call?.id
+    const generation = this.generation
     let cancelled = false
     let cancel!: () => void
     const cancellation = new Promise<never>((_, reject) => { cancel = () => { cancelled = true; reject(new MediaCancelled()) } })
     this.cancelMedia = cancel
-    const acquisition = navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(stream => {
-      if (cancelled || this.disposed || this.view.call?.id !== callID || !active(this.view.call)) {
+    const acquisition = Promise.resolve().then(() => {
+      if (cancelled) throw new MediaCancelled()
+      return navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    }).catch(error => { if (error instanceof MediaCancelled) throw error; throw deviceError(error) }).then(stream => {
+      if (cancelled || this.disposed || generation !== this.generation || this.view.call?.id !== callID || !active(this.view.call)) {
         stream.getTracks().forEach(track => track.stop())
         throw new MediaCancelled()
+      }
+      if (!stream.getAudioTracks().some(track => track.readyState !== 'ended')) {
+        stream.getTracks().forEach(track => track.stop())
+        throw new Error('Микрофон не передаёт звук. Подключите его и повторите попытку.')
+      }
+      for (const track of stream.getAudioTracks()) track.onended = () => {
+        if (generation !== this.generation || this.disposed) return
+        this.failure(new Error('Микрофон отключён. Подключите его и позвоните заново.'))
+        void this.finish()
       }
       return stream
     })
@@ -120,8 +155,8 @@ export class CallController {
   }
 
   async start(conversationID: string) {
-    if (this.view.busy || active(this.view.call)) return
-    this.emit({ busy: true, error: '' })
+    if (this.disposed || this.view.busy || active(this.view.call)) return
+    this.emit({ busy: true, error: '', cameraError: '' })
     try {
       // Reserve the call first; applying a new call resets resources.
       const id = crypto.randomUUID()
@@ -140,10 +175,11 @@ export class CallController {
 
   async action(action: 'accept' | 'reject' | 'cancel' | 'end') {
     const call = this.view.call
-    if (!call || this.view.busy) return
+    if (this.disposed || !call || this.view.busy) return
     this.emit({ busy: true, error: '' })
     try {
       if (action === 'accept') await this.media()
+      if (this.disposed || this.view.call?.id !== call.id || !active(this.view.call)) return
       const { data } = await api.post<{ call: Call }>('/calls/' + call.id + '/actions', { action })
       if (this.disposed) return
       this.apply(data.call)
@@ -191,8 +227,14 @@ export class CallController {
       const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
       this.pc = pc
       const remote = new MediaStream()
-      this.emit({ remote, connection: 'Устанавливаем видео соединение…' })
-      this.view.local.getTracks().forEach((track) => pc.addTrack(track, this.view.local!))
+      this.emit({ remote, connection: 'Устанавливаем соединение…' })
+      this.view.local.getAudioTracks().forEach((track) => pc.addTrack(track, this.view.local!))
+      // Reserve a video section in SDP even for microphone-only calls. This
+      // allows replaceTrack() to enable video later without renegotiation.
+      if (call.caller_id === this.userID) {
+        const video = this.view.local.getVideoTracks()[0]
+        this.videoSender = pc.addTransceiver(video ?? 'video', { direction: 'sendrecv', streams: [this.view.local] }).sender
+      }
       pc.ontrack = (event) => {
         if (this.pc !== pc) return
         const sameTrack = (a: MediaStreamTrack, b: MediaStreamTrack) => a === b || (!!a.id && a.id === b.id)
@@ -210,7 +252,7 @@ export class CallController {
       }
       pc.onconnectionstatechange = () => {
         if (this.pc !== pc) return
-        const labels: Record<string, string> = { connected: 'Видео соединение установлено', connecting: 'Соединяемся…', disconnected: 'Связь прервана. Ждём восстановления…', failed: 'Соединение не удалось. Для разных сетей может понадобиться TURN.' }
+        const labels: Record<string, string> = { connected: 'Соединение установлено', connecting: 'Соединяемся…', disconnected: 'Связь прервана. Ждём восстановления…', failed: 'Соединение не удалось. Для разных сетей может понадобиться TURN.' }
         this.emit({ connection: labels[pc.connectionState] ?? pc.connectionState })
         if (pc.connectionState === 'failed') void this.finish()
       }
@@ -227,19 +269,35 @@ export class CallController {
   private async receive(call: Call) {
     let more = true
     while (more && !this.disposed && this.pc) {
-      const { data } = await api.get<{ signals: Signal[]; next_cursor: string; has_more: boolean }>('/calls/' + call.id + '/signals', { params: { after: this.cursor } })
       const pc = this.pc
-      if (!pc || this.disposed || this.view.call?.id !== call.id || this.view.call.status !== 'accepted') return
+      const { data } = await api.get<{ signals: Signal[]; next_cursor: string; has_more: boolean }>('/calls/' + call.id + '/signals', { params: { after: this.cursor } })
+      if (this.pc !== pc || this.disposed || this.view.call?.id !== call.id || this.view.call.status !== 'accepted') return
       for (const signal of data.signals) {
         if (signal.type === 'ice') {
           if (pc.remoteDescription) await pc.addIceCandidate(signal.payload)
           else this.candidates.push(signal.payload)
         } else {
           await pc.setRemoteDescription(signal.payload)
-          for (const candidate of this.candidates) await pc.addIceCandidate(candidate)
+          if (this.pc !== pc) return
+          for (const candidate of this.candidates) {
+            await pc.addIceCandidate(candidate)
+            if (this.pc !== pc) return
+          }
           this.candidates = []
           if (signal.type === 'offer') {
+            // The answerer must use the video transceiver created by the remote
+            // offer. Adding one beforehand can leave an extra unnegotiated
+            // sender, so its camera never reaches the caller.
+            const video = pc.getTransceivers().find(item => item.receiver.track.kind === 'video')
+            if (video && this.view.local) {
+              video.direction = 'sendrecv'
+              this.videoSender = video.sender
+              video.sender.setStreams?.(this.view.local)
+              await video.sender.replaceTrack(this.view.local.getVideoTracks()[0] ?? null)
+              if (this.pc !== pc) return
+            }
             await pc.setLocalDescription(await pc.createAnswer())
+            if (this.pc !== pc) return
             await this.send(call, 'answer', { type: 'answer', sdp: pc.localDescription!.sdp })
           }
         }
@@ -250,9 +308,66 @@ export class CallController {
   }
 
   toggle(kind: 'audio' | 'video') {
+    if (kind === 'video') { void this.toggleCamera(); return }
     const tracks = this.view.local?.getTracks().filter((track) => track.kind === kind) ?? []
     tracks.forEach((track) => { track.enabled = !track.enabled })
     this.emit({})
+  }
+
+  async toggleCamera() {
+    const call = this.view.call
+    const local = this.view.local
+    if (!local || !active(call) || this.disposed || this.view.cameraBusy) return
+    const current = local.getVideoTracks()
+    if (current.length) {
+      this.emit({ cameraBusy: true, cameraError: '' })
+      const generation = this.generation
+      // Stop capture immediately, even if detaching the sender fails.
+      current.forEach(track => { track.onended = null; track.stop() })
+      this.emit({ local: new MediaStream(local.getAudioTracks()) })
+      try {
+        await this.videoSender?.replaceTrack(null)
+      } catch { if (generation === this.generation) this.emit({ cameraError: 'Камера выключена, но не удалось обновить видеоканал.' }) }
+      finally { if (generation === this.generation) this.emit({cameraBusy:false}) }
+      return
+    }
+    const generation = this.generation
+    let cancelled = false
+    let cancel!: () => void
+    const cancellation = new Promise<never>((_, reject) => { cancel = () => { cancelled = true; reject(new MediaCancelled()) } })
+    this.cancelCamera = cancel
+    this.emit({ cameraBusy: true, cameraError: '' })
+    let acquired: MediaStream | undefined
+    const acquisition = Promise.resolve().then(() => {
+      if (cancelled) throw new MediaCancelled()
+      return navigator.mediaDevices.getUserMedia({audio:false,video:true})
+    }).then(stream => {
+      if (cancelled || this.disposed || generation !== this.generation || !active(this.view.call)) {
+        stream.getTracks().forEach(track => track.stop())
+        throw new MediaCancelled()
+      }
+      acquired = stream
+      return stream
+    })
+    try {
+      const stream = await Promise.race([acquisition,cancellation])
+      const track = stream.getVideoTracks().find(track => track.readyState !== 'ended')
+      if (!track) throw new Error('no video track')
+      stream.getTracks().filter(other => other !== track).forEach(other => other.stop())
+      await this.videoSender?.replaceTrack(track)
+      if (generation !== this.generation || this.disposed) { stream.getTracks().forEach(track => track.stop()); return }
+      track.onended = () => {
+        if (generation !== this.generation || this.disposed) return
+        void this.toggleCamera()
+      }
+      this.emit({local:new MediaStream([...local.getAudioTracks(),track])})
+    } catch (error) {
+      acquired?.getTracks().forEach(track => track.stop())
+      if (!(error instanceof MediaCancelled) && generation === this.generation) this.emit({cameraError:deviceError(error,true).message})
+    } finally {
+      if (this.cancelCamera === cancel) this.cancelCamera = undefined
+      if (generation === this.generation) this.emit({cameraBusy:false})
+    }
   }
   private async inspectAudio() {
     const pc = this.pc
@@ -272,11 +387,14 @@ export class CallController {
     } catch { /* Diagnostics must not interrupt a working call. */ }
   }
   private release() {
+    this.generation++
     this.cancelMedia?.(); this.cancelMedia = undefined
+    this.cancelCamera?.(); this.cancelCamera = undefined
     this.pc?.close(); this.pc = undefined
-    this.view.local?.getTracks().forEach((track) => track.stop())
+    this.videoSender = undefined
+    this.view.local?.getTracks().forEach((track) => {track.onended=null;track.stop()})
     this.candidates = []; this.offerSent = false; this.outgoing = Promise.resolve()
-    this.emit({ local: null, remote: null, audio: undefined })
+    this.emit({ local: null, remote: null, audio: undefined, cameraBusy:false, cameraError:'' })
   }
   private abandon(call: Call) {
     const action = call.status === 'accepted' ? 'end' : call.caller_id === this.userID ? 'cancel' : 'reject'
@@ -286,6 +404,7 @@ export class CallController {
     }).catch(() => {})
   }
   dispose() {
+    if (this.disposed) return
     this.disposed = true
     clearInterval(this.timer); this.stopRealtime?.(); this.stopFocus?.()
     if (active(this.view.call)) this.abandon(this.view.call!)
