@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { birthdayLabel } from './birthdays'
 import { blockNotice, isRemovalAction, removalCommitted } from './conversation-controls'
 import type { ControlAction, RemovalAction } from './conversation-controls'
@@ -48,7 +49,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
   const action=confirmation;const id=conversation.id
   try{const state=await controls.action.mutateAsync({value:action,id});if(isRemovalAction(action)&&removalCommitted(action,state)){close();onRemoved(id,action);return}setCompleted(action==='block'?'Контакт заблокирован.':action==='unblock'?'Контакт разблокирован.':'Изменения сохранены.');setConfirmation(null)}catch{/* Keep the confirmation and its request error for retry. */}
  }
- return <dialog ref={dialog} className="z-contact-dialog" aria-labelledby="contact-profile-title" onCancel={event=>{
+ return createPortal(<dialog ref={dialog} className="z-contact-dialog" aria-labelledby="contact-profile-title" onCancel={event=>{
   event.preventDefault();if(controls.action.isPending)return
   if(confirmation){setConfirmation(null);return}
   if(menu.current?.open){menu.current.open=false;menu.current.querySelector<HTMLElement>('summary')?.focus();return}close()
@@ -64,9 +65,9 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  {profile.isFetching&&<p role="status" className="z-muted">Загружаем профиль…</p>}
  {profile.isError&&<div role="alert"><p className="notice">{oldServer?'Дополнительные сведения профиля пока недоступны.':errorText(profile.error)}</p><button type="button" className="secondary" onClick={()=>void profile.refetch()} disabled={profile.isFetching}>Повторить</button></div>}
  {profile.data&&!profile.isFetching&&!profile.isError&&<><dl className="z-contact-details">{peer.phone&&<><dt>Телефон</dt><dd>{peer.phone}</dd></>}</dl>{!peer.phone&&<p className="z-muted">Собеседник не открыл контактные данные.</p>}</>}
- {birthday&&<p>День рождения: {birthday.label}{birthday.today&&<strong className="z-birthday-today"> · Сегодня 🎉</strong>}</p>}
+ {profile.data&&!profile.isFetching&&!profile.isError&&<dl className="z-contact-details"><dt>День рождения</dt><dd>{birthday?birthday.label:'Не указан'}{birthday?.today&&<strong className="z-birthday-today"> · Сегодня 🎉</strong>}</dd></dl>}
  {notice&&<p className="notice" role="status">{notice}</p>}
  <button type="button" className="primary" disabled={callBusy||controls.blocked||controls.unavailable} onClick={()=>{close();onCall()}}><Phone size={19}/>Позвонить</button>{callBusy&&<p className="z-field-help">Сначала завершите текущий звонок.</p>}
  {controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<div><p className="notice" role="alert">{errorText(controls.error)}</p><button className="secondary" type="button" onClick={()=>void controls.refetch()}>Повторить</button></div>}{completed&&<p role="status">{completed}</p>}
- </div>}</dialog>
+ </div>}</dialog>,document.body)
 }
