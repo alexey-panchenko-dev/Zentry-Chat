@@ -75,3 +75,10 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .z-call-playback{bottom:110px;max-height:230px}.z-call-playback .z-audio-control{padding-top:0}.z-audio-alternate{background:none;border:0;color:var(--z-lime);font-size:11px;padding:10px 0 0;text-align:left;line-height:1.5}
 @media(max-width:720px){.z-call-playback{left:14px;bottom:100px;max-height:245px;width:calc(100% - 28px)}.z-call-playback .z-audio-details{display:none}}
 @media(max-width:720px){.z-call-feedback{top:82px;left:14px;right:14px}.z-call-feedback .z-audio-diagnostics{max-width:100%}}
+/* Compact controls keep their row; unread counts never push the chat icon. */
+.z-collapse{align-self:flex-start;flex-shrink:0}
+.is-compact .z-sidebar-head{flex-direction:row;width:100%;gap:6px;align-items:flex-start}
+.is-compact .z-sidebar-head .z-brand img{width:22px;height:22px}
+.z-sidebar nav button{position:relative}
+.is-compact .z-sidebar nav .z-unread{position:absolute;top:auto;right:2px;bottom:2px;margin:0;min-width:18px;height:18px;padding:0 4px;font-size:10px;line-height:1}
+@media(max-width:1100px){.z-sidebar-head{flex-direction:row;width:100%;gap:6px;align-items:flex-start}.z-sidebar-head .z-brand img{width:22px;height:22px}.z-sidebar nav .z-unread{position:absolute;top:auto;right:2px;bottom:2px;margin:0;min-width:18px;height:18px;padding:0 4px;font-size:10px;line-height:1}}
