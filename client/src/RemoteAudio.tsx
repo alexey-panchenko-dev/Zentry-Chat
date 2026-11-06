@@ -1,89 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
+import { Volume2, VolumeX, RotateCw } from 'lucide-react'
+import { bindRemoteAudio } from './remote-audio'
+import type { AudioPlayback } from './remote-audio'
 
 export function RemoteAudio({ stream }: { stream: MediaStream | null }) {
   const ref = useRef<HTMLAudioElement>(null)
-  const [playing, setPlaying] = useState(false)
-  const [status, setStatus] = useState('Ожидаем аудиодорожку…')
-  const [error, setError] = useState('')
-
-  function enable() {
-    const audio = ref.current
-    if (!audio) return
-    setError('')
-    setStatus('Включаем звук…')
-    audio.muted = false
-    audio.volume = 1
-    void audio.play().then(() => {
-      setPlaying(!audio.paused)
-      setStatus('Воспроизведение включено. Если тихо, проверьте громкость устройства и микрофон собеседника.')
-    }).catch((reason: unknown) => {
-      setPlaying(false)
-      setError(reason instanceof Error ? reason.name + ': ' + reason.message : 'Не удалось включить звук')
-      setStatus('Воспроизведение заблокировано')
-    })
-  }
-
+  const retry = useRef<(() => Promise<void>) | null>(null)
+  const [state, setState] = useState<AudioPlayback>({ playing: false, blocked: false, source: 'waiting', error: false })
   useEffect(() => {
-    const audio = ref.current
-    if (!audio) return
-    const lifecycle = { disposed: false }
-    const output = new MediaStream()
-    const tracks = new Set<MediaStreamTrack>()
-    const update = () => {
-      if (lifecycle.disposed) return
-      for (const track of stream?.getAudioTracks() ?? []) {
-        if (tracks.has(track)) continue
-        tracks.add(track)
-        output.addTrack(track)
-        track.addEventListener('unmute', retry)
-        track.addEventListener('mute', update)
-        track.addEventListener('ended', update)
-      }
-      for (const track of output.getAudioTracks()) {
-        if (track.readyState === 'ended' || !stream?.getTracks().includes(track)) output.removeTrack(track)
-      }
-      if (!output.getAudioTracks().length) setStatus('Ожидаем аудиодорожку…')
-      else if (output.getAudioTracks().every((track) => track.muted)) setStatus('Аудиодорожка есть, ожидаем данные')
-    }
-    const retry = () => {
-      update()
-      if (!output.getAudioTracks().length) return
-      void audio.play().catch(() => { if (!lifecycle.disposed) setStatus('Нажмите «Включить звук»') })
-    }
-    const onPlaying = () => { setPlaying(true); setStatus('Воспроизведение звука включено') }
-    const onPause = () => setPlaying(false)
-    // A dedicated audio-only stream avoids coupling sound to video playback.
-    audio.srcObject = output
-    audio.muted = false
-    audio.volume = 1
-    audio.addEventListener('playing', onPlaying)
-    audio.addEventListener('pause', onPause)
-    stream?.addEventListener('addtrack', retry)
-    stream?.addEventListener('removetrack', update)
-    retry()
-    return () => {
-      lifecycle.disposed = true
-      stream?.removeEventListener('addtrack', retry)
-      stream?.removeEventListener('removetrack', update)
-      for (const track of tracks) {
-        track.removeEventListener('unmute', retry)
-        track.removeEventListener('mute', update)
-        track.removeEventListener('ended', update)
-      }
-      audio.removeEventListener('playing', onPlaying)
-      audio.removeEventListener('pause', onPause)
-      audio.pause()
-      audio.srcObject = null
-      // Received tracks belong to the call controller; do not stop them here.
-    }
+    if (!ref.current) return
+    const binding = bindRemoteAudio(ref.current, stream, setState)
+    retry.current = binding.retry
+    return () => { retry.current = null; binding.dispose() }
   }, [stream])
-
-  return <div className="space-y-2 bg-slate-900 p-3">
-    <audio ref={ref} autoPlay controls className="w-full" aria-label="Звук собеседника" />
-    <button type="button" className="secondary w-full" onClick={enable}>
-      {playing ? 'Звук включён — включить повторно' : 'Включить звук'}
-    </button>
-    <p className="text-xs text-slate-400" role="status">{status}</p>
-    {error && <p className="text-xs text-amber-300" role="alert">{error}</p>}
+  const live = state.source === 'live' && state.playing
+  const status = state.source === 'waiting' ? 'Ожидаем аудиодорожку'
+    : state.source === 'muted' ? 'Дорожка есть · ожидаем аудиоданные'
+    : state.blocked ? 'Браузер просит включить звук'
+    : state.playing ? 'Аудиоплеер работает' : 'Звук не воспроизводится'
+  return <div className="z-audio-control">
+    <audio ref={ref} autoPlay aria-label="Звук собеседника" />
+    <div className="z-audio-heading"><span className={'z-audio-symbol'+(live?' is-playing':'')}>{live?<Volume2 size={20}/>:<VolumeX size={20}/>}</span><div><strong>Звук собеседника</strong><span role="status">{status}</span></div></div>
+    <button type="button" className="secondary z-audio-retry" onClick={()=>void retry.current?.()} disabled={state.source==='waiting'}><RotateCw size={14}/>{state.playing?'Перезапустить звук':'Включить звук'}</button>
+    <details className="z-audio-details"><summary>Если собеседника не слышно</summary><p>Посмотри «Проверку звука» вверху звонка. Счётчик «Получено» показывает приём аудио. Работа плеера сама по себе не подтверждает наличие голоса.</p><p>Проверь громкость устройства и микрофон собеседника.</p></details>
+    {state.error&&<p className="notice" role="alert">{state.blocked?'Браузер заблокировал автовоспроизведение. Нажми «Включить звук».':'Не удалось воспроизвести аудио. Попробуй включить звук ещё раз.'}</p>}
   </div>
 }

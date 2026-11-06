@@ -14,6 +14,7 @@ const tracks = () => [{ kind: 'audio', enabled: true, stopped: false, stop() { t
 class Stream {
   constructor(items = []) { this.items = items }
   getTracks() { return this.items }
+  getAudioTracks() { return this.items.filter(track => track.kind === 'audio') }
   addTrack(track) { this.items.push(track) }
 }
 class Peer {
@@ -116,5 +117,105 @@ test('Remote browser stream retains both audio and video tracks', async () => {
   assert.equal(client.view.remote, incoming)
   assert.deepEqual(client.view.remote.getTracks().map((track) => track.kind), ['audio', 'video'])
   await client.finish()
+  client.dispose()
+})
+
+test('Separate browser stream associations never replace received audio with video', async () => {
+  reset()
+  navigator.mediaDevices.getUserMedia = async () => new Stream(tracks())
+  const client = new CallController('me', () => {})
+  await client.start('dialog')
+  current = { ...current, status: 'accepted', version: 2 }
+  await client.sync()
+  const [audio, video] = tracks()
+  audio.id = 'remote-audio'; video.id = 'remote-video'
+  const peer = Peer.instances[0]
+  peer.ontrack({ track: audio, streams: [new Stream([audio])] })
+  peer.ontrack({ track: video, streams: [new Stream([video])] })
+  assert.deepEqual(client.view.remote.getTracks().map(t => t.kind), ['audio', 'video'])
+  await client.finish()
+  client.dispose()
+})
+
+test('Hangup immediately releases a pending permission request and discards its late stream', async () => {
+  reset()
+  let resolveMedia
+  const late = new Stream(tracks())
+  navigator.mediaDevices.getUserMedia = () => new Promise(resolve => { resolveMedia = resolve })
+  const client = new CallController('me', () => {})
+  const starting = client.start('dialog')
+  while (!resolveMedia) await new Promise(resolve => setImmediate(resolve))
+  await client.finish()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(client.view.busy, false, 'hangup must not wait for browser permission')
+  resolveMedia(late)
+  await starting
+  assert.ok(late.getTracks().every(track => track.stopped))
+  assert.equal(client.view.local, null)
+  client.dispose()
+})
+
+test('Streamless late audio publishes a new stream so the output binding sees it', async () => {
+  reset()
+  navigator.mediaDevices.getUserMedia = async () => new Stream(tracks())
+  const client = new CallController('me', () => {})
+  await client.start('dialog')
+  current = { ...current, status: 'accepted', version: 2 }
+  await client.sync()
+  const [audio, video] = tracks()
+  const peer = Peer.instances[0]
+  peer.ontrack({ track: video, streams: [] })
+  const before = client.view.remote
+  peer.ontrack({ track: audio, streams: [] })
+  assert.notEqual(client.view.remote, before, 'programmatic addTrack does not emit addtrack in browsers')
+  assert.deepEqual(client.view.remote.getTracks().map(t => t.kind), ['video', 'audio'])
+  await client.finish()
+  client.dispose()
+})
+
+test('Separate streams also retain audio when video arrives first', async () => {
+  reset()
+  navigator.mediaDevices.getUserMedia = async () => new Stream(tracks())
+  const client = new CallController('me', () => {})
+  await client.start('dialog')
+  current = { ...current, status: 'accepted', version: 2 }
+  await client.sync()
+  const [audio, video] = tracks()
+  const peer = Peer.instances[0]
+  peer.ontrack({ track: video, streams: [new Stream([video])] })
+  peer.ontrack({ track: audio, streams: [new Stream([audio])] })
+  assert.deepEqual(client.view.remote.getTracks().map(t => t.kind), ['video', 'audio'])
+  await client.finish()
+  client.dispose()
+})
+
+test('Audio diagnostics exclude video and ignore stats resolving after hangup', async () => {
+  reset()
+  navigator.mediaDevices.getUserMedia = async () => new Stream(tracks())
+  const client = new CallController('me', () => {})
+  await client.start('dialog')
+  current = { ...current, status: 'accepted', version: 2 }
+  await client.sync()
+  const peer = Peer.instances[0]
+  Object.assign(client.view.local.getAudioTracks()[0], {readyState:'live',muted:false})
+  peer.getStats = async () => [
+    {type:'outbound-rtp',kind:'audio',bytesSent:1024},
+    {type:'inbound-rtp',kind:'audio',bytesReceived:2048},
+    {type:'outbound-rtp',kind:'video',bytesSent:99999},
+    {type:'media-source',kind:'audio',audioLevel:0.5},
+  ]
+  await client.sync()
+  assert.deepEqual(client.view.audio,{sent:1024,received:2048,inputLevel:0.5,inputEnabled:true,inputMuted:false})
+  peer.getStats = async () => []
+  await client.sync()
+  assert.equal(client.view.audio.inputLevel,null)
+  let resolveStats
+  peer.getStats = () => new Promise(resolve => {resolveStats=resolve})
+  const syncing = client.sync()
+  while(!resolveStats) await new Promise(resolve=>setImmediate(resolve))
+  await client.finish()
+  resolveStats([])
+  await syncing
+  assert.equal(client.view.audio,undefined)
   client.dispose()
 })

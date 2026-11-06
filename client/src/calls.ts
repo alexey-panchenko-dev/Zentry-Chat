@@ -8,9 +8,11 @@ export type Call = {
 export type CallView = {
   call: Call | null; local: MediaStream | null; remote: MediaStream | null
   connection: string; error: string; busy: boolean
+  audio?: { sent: number; received: number; inputLevel: number | null; inputEnabled: boolean; inputMuted: boolean }
 }
 type Signal = { id: string; type: 'offer' | 'answer' | 'ice'; payload: RTCSessionDescriptionInit & RTCIceCandidateInit }
 const active = (call: Call | null) => call?.status === 'ringing' || call?.status === 'accepted'
+class MediaCancelled extends Error {}
 
 export class CallController {
   view: CallView = { call: null, local: null, remote: null, connection: 'Подключаем канал звонков…', error: '', busy: false }
@@ -26,6 +28,8 @@ export class CallController {
   private rerun = false
   private outgoing: Promise<void> = Promise.resolve()
   private offerSent = false
+  private cancelMedia?: () => void
+  private finishing = false
 
   constructor(userID: string, update: (view: CallView) => void) { this.userID = userID; this.update = update }
   private emit(patch: Partial<CallView>) {
@@ -91,6 +95,7 @@ export class CallController {
         if (call?.status === 'accepted' && this.view.local) {
           await this.ensurePeer(call)
           await this.receive(call)
+          await this.inspectAudio()
         }
       } while (this.rerun && !this.disposed)
     } catch (error) {
@@ -102,10 +107,20 @@ export class CallController {
   private async media() {
     if (this.view.local) return
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Камера доступна на localhost или HTTPS.')
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-    if (this.disposed) { stream.getTracks().forEach((track) => track.stop()); throw new Error('Звонок закрыт') }
-    if (!active(this.view.call)) { stream.getTracks().forEach((track) => track.stop()); throw new Error('Вызов уже завершён') }
-    this.emit({ local: stream })
+    const callID = this.view.call?.id
+    let cancelled = false
+    let cancel!: () => void
+    const cancellation = new Promise<never>((_, reject) => { cancel = () => { cancelled = true; reject(new MediaCancelled()) } })
+    this.cancelMedia = cancel
+    const acquisition = navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(stream => {
+      if (cancelled || this.disposed || this.view.call?.id !== callID || !active(this.view.call)) {
+        stream.getTracks().forEach(track => track.stop())
+        throw new MediaCancelled()
+      }
+      return stream
+    })
+    try { this.emit({ local: await Promise.race([acquisition, cancellation]) }) }
+    finally { if (this.cancelMedia === cancel) this.cancelMedia = undefined }
   }
 
   async start(conversationID: string) {
@@ -120,6 +135,7 @@ export class CallController {
       await this.media()
       await this.sync()
     } catch (error) {
+      if (error instanceof MediaCancelled) return
       this.failure(error)
       if (active(this.view.call)) await this.finish()
       else this.release()
@@ -137,6 +153,7 @@ export class CallController {
       this.apply(data.call)
       await this.sync()
     } catch (error) {
+      if (error instanceof MediaCancelled) return
       this.failure(error)
       if (action === 'accept') this.release()
       void this.sync()
@@ -144,14 +161,17 @@ export class CallController {
   }
 
   async finish() {
+    if (this.finishing) return
+    this.finishing = true
     const call = this.view.call
     this.release()
-    if (!active(call)) return
+    if (!active(call)) { this.finishing = false; return }
     try {
       const action = call!.status === 'accepted' ? 'end' : call!.caller_id === this.userID ? 'cancel' : 'reject'
       const { data } = await api.post<{ call: Call }>('/calls/' + call!.id + '/actions', { action })
       this.apply(data.call)
     } catch (error) { this.failure(error) }
+    finally { this.finishing = false }
   }
 
   private send(call: Call, type: string, payload: object) {
@@ -179,9 +199,15 @@ export class CallController {
       this.view.local.getTracks().forEach((track) => pc.addTrack(track, this.view.local!))
       pc.ontrack = (event) => {
         if (this.pc !== pc) return
-        if (!remote.getTracks().some((track) => track.id === event.track.id)) remote.addTrack(event.track)
-        // Preserve the browser-provided stream association when available.
-        this.emit({ remote: event.streams[0] ?? remote })
+        const sameTrack = (a: MediaStreamTrack, b: MediaStreamTrack) => a === b || (!!a.id && a.id === b.id)
+        if (!remote.getTracks().some(track => sameTrack(track, event.track))) remote.addTrack(event.track)
+        // Browsers may associate audio/video with different streams. Only use
+        // the associated stream if it contains every track already received.
+        const associated = event.streams[0]
+        const complete = associated && remote.getTracks().every(track => associated.getTracks().some(other => sameTrack(track, other)))
+        // addTrack() does not dispatch addtrack for a locally constructed
+        // stream. Publish a snapshot so React rebinds when late audio arrives.
+        this.emit({ remote: complete ? associated : new MediaStream(remote.getTracks()) })
       }
       pc.onicecandidate = (event) => {
         if (this.pc === pc && event.candidate) void this.send(call, 'ice', event.candidate.toJSON()).catch(() => {})
@@ -232,11 +258,29 @@ export class CallController {
     tracks.forEach((track) => { track.enabled = !track.enabled })
     this.emit({})
   }
+  private async inspectAudio() {
+    const pc = this.pc
+    if (!pc || typeof pc.getStats !== 'function') return
+    try {
+      const stats = await pc.getStats()
+      if (this.pc !== pc) return
+      let sent = 0, received = 0, inputLevel: number | null = null
+      stats.forEach(report => {
+        if ((report.kind ?? report.mediaType) !== 'audio') return
+        if (report.type === 'outbound-rtp') sent += report.bytesSent ?? 0
+        if (report.type === 'inbound-rtp') received += report.bytesReceived ?? 0
+        if (report.type === 'media-source' && typeof report.audioLevel === 'number') inputLevel = report.audioLevel
+      })
+      const tracks = this.view.local?.getAudioTracks() ?? []
+      this.emit({ audio: { sent, received, inputLevel, inputEnabled: tracks.some(t => t.enabled && t.readyState === 'live'), inputMuted: tracks.length === 0 || tracks.every(t => t.muted) } })
+    } catch { /* Diagnostics must not interrupt a working call. */ }
+  }
   private release() {
+    this.cancelMedia?.(); this.cancelMedia = undefined
     this.pc?.close(); this.pc = undefined
     this.view.local?.getTracks().forEach((track) => track.stop())
     this.candidates = []; this.offerSent = false; this.outgoing = Promise.resolve()
-    this.emit({ local: null, remote: null })
+    this.emit({ local: null, remote: null, audio: undefined })
   }
   private abandon(call: Call) {
     const action = call.status === 'accepted' ? 'end' : call.caller_id === this.userID ? 'cancel' : 'reject'
