@@ -22,3 +22,5 @@ ProfilePhoto owns JPG/PNG selection (2 MiB), preview, replacement/removal and pe
 Auth and search forms own localized inline validation with first-invalid-field focus; native constraint checks are retained without browser popups. Composer textarea uses the shared resize-none rule to preserve action visibility.
 
 The single composer surface contains the idle microphone beside the text draft and send button. Recording/requesting/preview replace the text controls within that surface; the mounted text input retains its draft and returns after send/cancel. Voice preview has only its own send action.
+
+MediaAvailability requires explicit authenticated server capability flags from /realtime/config before mounting voice/photo controls. Missing flags, old servers and lookup errors keep uploads/recording unavailable with a compact explanation; checks repeat every 30 seconds until supported. Text and call flows retain their existing behavior.

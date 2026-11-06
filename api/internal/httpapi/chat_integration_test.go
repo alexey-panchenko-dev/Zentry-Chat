@@ -106,6 +106,15 @@ func TestChatAccessAndDelivery(t *testing.T) {
 		return result
 	}
 	request(-1, "GET", "/api/conversations", "", 401)
+	request(-1, "GET", "/api/realtime/config", "", 401)
+	capabilities := request(0, "GET", "/api/realtime/config", "", 200)
+	if string(capabilities["enabled"]) != "true" || string(capabilities["key"]) != `"public-key"` || string(capabilities["cluster"]) != `"eu"` {
+		t.Fatalf("original realtime keys changed: %s", capabilities)
+	}
+	var media map[string]bool
+	if err := json.Unmarshal(capabilities["media"], &media); err != nil || !media["voice"] || !media["profile_photos"] {
+		t.Fatalf("missing media capabilities: %s (%v)", capabilities, err)
+	}
 	found := request(0, "GET", "/api/users?query="+users[1].Email, "", 200)
 	var publicUsers []chat.PublicUser
 	_ = json.Unmarshal(found["users"], &publicUsers)
@@ -188,10 +197,11 @@ func TestChatAccessAndDelivery(t *testing.T) {
 	}
 	defer response.Body.Close()
 	var config struct {
-		Enabled bool `json:"enabled"`
+		Enabled bool            `json:"enabled"`
+		Media   map[string]bool `json:"media"`
 	}
 	_ = json.NewDecoder(response.Body).Decode(&config)
-	if response.StatusCode != 200 || config.Enabled {
+	if response.StatusCode != 200 || config.Enabled || !config.Media["voice"] || !config.Media["profile_photos"] {
 		t.Fatal("disabled realtime config incorrect")
 	}
 }

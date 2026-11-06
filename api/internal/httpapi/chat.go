@@ -162,7 +162,12 @@ func (h *chatHandlers) sendMessage(w http.ResponseWriter, r *http.Request, user 
 }
 
 func (h *chatHandlers) realtimeConfig(w http.ResponseWriter, r *http.Request, user auth.User) {
-	writeJSON(w, 200, h.publisher.PublicConfig())
+	config := make(map[string]any)
+	for key, value := range h.publisher.PublicConfig() {
+		config[key] = value
+	}
+	config["media"] = map[string]bool{"voice": true, "profile_photos": true}
+	writeJSON(w, 200, config)
 }
 
 func (h *chatHandlers) pusherAuth(w http.ResponseWriter, r *http.Request, user auth.User) {

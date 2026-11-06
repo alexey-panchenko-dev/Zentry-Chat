@@ -47,3 +47,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .z-composer>.z-voice-composer[data-active=true]{flex:1;min-width:0}
 .z-composer>.z-voice-composer[data-phase=error]{flex-basis:100%;order:3}
 .z-composer:has(.z-voice-composer[data-phase=error]){flex-wrap:wrap}
+
+.z-media-unavailable{display:block;color:var(--z-muted);font-size:11px;line-height:1.5}
+.z-composer:has(>.z-media-unavailable){flex-wrap:wrap}
+.z-composer>.z-media-unavailable{flex-basis:100%;order:3}
