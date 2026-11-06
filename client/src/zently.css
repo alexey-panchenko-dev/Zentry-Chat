@@ -123,6 +123,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 @media(max-width:1100px){.z-sidebar-head,.is-compact .z-sidebar-head{height:80px;min-height:80px;flex-basis:80px;justify-content:center}.z-sidebar nav button{height:54px;min-height:54px}}
 @media(max-width:720px){.z-sidebar-head,.is-compact .z-sidebar-head{height:64px;min-height:64px;flex-basis:64px;padding-bottom:25px}.z-sidebar .z-brand img,.is-compact .z-sidebar .z-brand img{width:29px;height:29px}.z-sidebar nav button,.is-compact .z-sidebar nav button{height:47px;min-height:47px}}
 
-/* Subtle shared panel texture, clipped naturally by each rounded surface. */
-.z-sidebar,.z-dialogs{background-color:#0e0b10;background-image:radial-gradient(ellipse at 0% 25%,#ff14930c,transparent 65%),radial-gradient(ellipse at 100% 100%,#b7ff3908,transparent 55%),repeating-linear-gradient(135deg,transparent 0 31px,#ddc8df04 31px 32px);background-clip:padding-box}
-.z-dialogs{background-image:radial-gradient(ellipse at 100% 0%,#ff14930c,transparent 60%),radial-gradient(ellipse at 5% 100%,#b7ff3907,transparent 55%),radial-gradient(circle,#d5c0db10 .7px,transparent 1px);background-size:100% 100%,100% 100%,26px 26px}
+/* Smooth graphite surfaces with broad edge lighting. */
+.z-sidebar,.z-dialogs{background-color:#100d12;background-image:radial-gradient(ellipse 130% 65% at 120% -15%,#63334b24,transparent 72%),linear-gradient(165deg,#171219 0%,#100d12 48%,#0d0c10 100%);background-clip:padding-box;background-size:100% 100%;background-repeat:no-repeat}
+.z-dialogs{background-image:radial-gradient(ellipse 100% 55% at 115% 105%,#56623b12,transparent 75%),radial-gradient(ellipse 120% 55% at 110% -10%,#70344e24,transparent 72%),linear-gradient(165deg,#18131a,#100d12 48%,#0e0d11);box-shadow:inset 0 1px 0 #ffffff04}
