@@ -158,3 +158,9 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 
 .z-chat-header{background:linear-gradient(110deg,#30242fba,#211d26a8 58%,#1b1920a1);border:1px solid #ff89c018;border-bottom-color:#ff89c02c;border-radius:18px;margin:10px 12px 0;padding:10px 14px;min-height:70px}
 @media(max-width:720px){.z-chat-header{margin:6px 8px 0;padding-left:38px;padding-right:42px;min-height:70px}}
+
+/* Group creation shares the approved chat atmosphere. */
+.z-group-create{background-color:#100b13;background-image:radial-gradient(ellipse 82% 46% at 4% 4%,#ff14932c,transparent 78%),radial-gradient(ellipse 70% 42% at 96% 90%,#b7ff3911,transparent 80%),linear-gradient(155deg,#1a111d 0%,#100c14 60%,#151017 100%);border-color:#ff149359;box-shadow:0 24px 80px #0009,0 0 26px #ff14931c}
+.z-group-create .z-contact-dialog-head{border-bottom:1px solid #ff77ba20;padding-bottom:12px}.z-group-create .z-group-name input{background:linear-gradient(140deg,#2a202b,#1e1922);border:1px solid #ff77ba2e;box-shadow:inset 0 1px 0 #ffffff0e}.z-group-create .z-group-name input:focus-visible{border-color:#ff56ad;box-shadow:0 0 0 3px #ff14931a}
+.z-group-create .z-group-pick{background:linear-gradient(110deg,#2a202bba,#1a171fbd);border-color:#ffffff10;transition:border-color .16s ease,background .16s ease}.z-group-create .z-group-pick:hover{border-color:#ff70b84d;background:#ff149313}.z-group-create .z-group-pick.is-picked{background:linear-gradient(105deg,#6a123d78,#2b1b2ac9);border-color:#ff4eaa;box-shadow:inset 3px 0 0 #ff1493,0 0 14px #ff14931a}
+@media(prefers-reduced-motion:reduce){.z-group-create .z-group-pick{transition:none}}

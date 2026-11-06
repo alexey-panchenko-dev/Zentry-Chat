@@ -52,3 +52,5 @@ Message receipts: one dark tick is server-saved, two dark ticks require a recipi
 User rejected dotted and striped navigation backgrounds. Sidebar and conversation list now use smooth graphite surfaces with broad, low-contrast plum upper-edge lighting and a faint olive lower-edge tint. No repeating pattern. Static CSS backgrounds stay within panel radii and do not intercept controls.
 
 Groups appear above personal chats in the existing list, marked by a pink graphite member icon. Creation opens a native centered dialog with a title and selectable existing contacts; submit is enabled after three people. Group history uses the existing incoming/outgoing bubble language with a small sender label, preserving the user's approved chat background. Mobile group chat uses the same back navigation as personal chat.
+
+Group creation now uses the same smooth pink/graphite ambient background as the approved chat, with a restrained lime corner tint. Selected contacts gain a pink edge and clear indicator; unselected rows remain calm and readable.
