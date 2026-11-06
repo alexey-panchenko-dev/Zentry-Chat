@@ -14,7 +14,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { subscribeRealtime } from './realtime.ts'
 import { Discovery, ProfileEditor } from '@/Discovery'
 import { useReadReceipt } from './read-receipt.ts'
-import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Check, CheckCheck, Heart, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { LogOut, MessageCircle, RefreshCw, Search, Send, Wifi, Settings, Phone, ArrowLeft, Plus, Check, CheckCheck, Heart, ChevronsLeft } from 'lucide-react'
 import { Brand, Avatar } from '@/Visual'
 import { api, errorText } from '@/api'
 import type { Conversation, Message, MessagePage, ReadState, User } from '@/api'
@@ -148,13 +148,14 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   })
 
   return <div data-ui-section={uiSection} className={'z-shell'+(compact?' is-compact':'')+(mobileChat?' has-mobile-chat':'')}>
-    <aside className="z-sidebar"><div className="z-sidebar-head"><Brand/><button className="z-icon z-collapse" aria-label={compact?'Развернуть меню':'Свернуть меню'} onClick={()=>setCompact(!compact)}>{compact?<ChevronsRight size={18}/>:<ChevronsLeft size={18}/>}</button></div>
+    <aside className="z-sidebar"><div className="z-sidebar-head"><Brand/></div>
       <nav aria-label="Основная навигация">
         <button className={uiSection==='chats'?'is-active':''} title="Чаты" onClick={()=>{setUiSection('chats');setMobileChat(false)}}><MessageCircle/><span>Чаты</span>{!!unread.data?.unread_chats&&<b className="z-unread" aria-label={`Непрочитанных чатов: ${unread.data.unread_chats}`}>{unread.data.unread_chats}</b>}</button>
         <button className={uiSection==='discovery'?'is-active':''} title="Знакомства" onClick={()=>{setUiSection('discovery');setMobileChat(true)}}><Heart/><span>Знакомства</span></button>
         <button className={uiSection==='calls'?'is-active':''} title="Звонки" onClick={()=>{setUiSection('calls');setMobileChat(true)}}><Phone/><span>Звонки</span></button>
         <button className={uiSection==='settings'?'is-active':''} title="Настройки" onClick={()=>{setUiSection('settings');setMobileChat(true)}}><Settings/><span>Настройки</span></button>
       </nav>
+      <button type="button" className="z-icon z-collapse" aria-label={compact?'Развернуть меню':'Свернуть меню'} aria-expanded={!compact} onClick={()=>setCompact(!compact)}><ChevronsLeft size={18}/></button>
       <button className="z-account" aria-label="Мой профиль" onClick={()=>{setUiSection('settings');setMobileChat(true)}}><Avatar user={user}/><span><strong>{user.name}</strong><small>Мой профиль</small></span></button>
     </aside>
     <aside className="z-dialogs"><div className="z-list-top"><span>Чаты</span><div><button className="z-icon" aria-label="Обновить переписки" onClick={()=>void dialogs.refetch()}><RefreshCw size={16}/></button><button className="z-icon" aria-label="Найти человека" onClick={()=>setSearchOpen(!searchOpen)}><Plus/></button></div></div>
