@@ -1,0 +1,238 @@
+package httpapi
+
+import (
+	"bytes"
+	"encoding/binary"
+	"image"
+	"image/png"
+	"math"
+	"os"
+	"testing"
+)
+
+func TestMediaValidation(t *testing.T) {
+	for _, v := range []struct {
+		mime string
+		b    []byte
+		ok   bool
+	}{{"audio/webm", []byte{0x1a, 0x45, 0xdf, 0xa3, 1}, false}, {"audio/ogg", []byte("OggSx"), false}, {"audio/mp4", []byte("xxxxftypisom"), false}, {"audio/webm", []byte("garbage"), false}, {"text/html", []byte("OggSx"), false}} {
+		if (validateAudio(v.mime, v.b) == nil) != v.ok {
+			t.Errorf("audio %s", v.mime)
+		}
+	}
+	var b bytes.Buffer
+	png.Encode(&b, image.NewRGBA(image.Rect(0, 0, 2, 2)))
+	if _, _, err := normalizePhoto(b.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := normalizePhoto([]byte("<svg/>")); err == nil {
+		t.Fatal("accepted SVG")
+	}
+	if _, _, err := normalizePhoto(make([]byte, 2*1024*1024+1)); err == nil {
+		t.Fatal("accepted oversized photo")
+	}
+}
+
+func audioFixture(t *testing.T, name string) []byte {
+	t.Helper()
+	b, err := os.ReadFile("testdata/" + name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+func TestEncodedAudioContainers(t *testing.T) {
+	for _, f := range []struct{ name, mime string }{{"silence.webm", "audio/webm"}, {"silence.ogg", "audio/ogg"}, {"silence.mp4", "audio/mp4"}, {"silence-fragmented.mp4", "audio/mp4"}} {
+		t.Run(f.name, func(t *testing.T) {
+			b := audioFixture(t, f.name)
+			if err := validateAudio(f.mime, b); err != nil {
+				t.Fatalf("encoded fixture rejected: %v", err)
+			}
+			for _, n := range []int{0, 4, 12, len(b) / 2} {
+				if validateAudio(f.mime, b[:n]) == nil {
+					t.Errorf("accepted truncation at %d", n)
+				}
+			}
+		})
+	}
+}
+
+func ebmlTestElement(id uint64, data []byte) []byte {
+	var idBytes [8]byte
+	binary.BigEndian.PutUint64(idBytes[:], id)
+	start := 0
+	for idBytes[start] == 0 {
+		start++
+	}
+	size := uint64(len(data))
+	n := 1
+	for size >= (uint64(1)<<(7*n))-1 {
+		n++
+	}
+	var sizeBytes [8]byte
+	binary.BigEndian.PutUint64(sizeBytes[:], size)
+	sizeBytes[8-n] |= 1 << uint(8-n)
+	out := append([]byte(nil), idBytes[start:]...)
+	out = append(out, sizeBytes[8-n:]...)
+	return append(out, data...)
+}
+func webmTestVariant(t *testing.T, b []byte, mode string) []byte {
+	t.Helper()
+	roots, e := ebmlChildren(b, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var out []byte
+	for _, root := range roots {
+		if root.id != 0x18538067 {
+			out = append(out, ebmlTestElement(root.id, root.data)...)
+			continue
+		}
+		children, e := ebmlChildren(root.data, true)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var segment []byte
+		for _, c := range children {
+			if mode == "no-audio" && c.id == 0x1654ae6b {
+				continue
+			}
+			if mode == "no-blocks" && c.id == 0x1f43b675 {
+				continue
+			}
+			if mode == "duration" && c.id == 0x1549a966 {
+				v, e := ebmlChildren(c.data, false)
+				if e != nil {
+					t.Fatal(e)
+				}
+				c.data = nil
+				for _, x := range v {
+					if x.id == 0x4489 {
+						var f [8]byte
+						binary.BigEndian.PutUint64(f[:], math.Float64bits(120001))
+						x.data = f[:]
+					}
+					c.data = append(c.data, ebmlTestElement(x.id, x.data)...)
+				}
+			}
+			encoded := ebmlTestElement(c.id, c.data)
+			if mode == "unknown" && c.id == 0x1f43b675 {
+				encoded = append([]byte{0x1f, 0x43, 0xb6, 0x75, 1, 255, 255, 255, 255, 255, 255, 255}, c.data...)
+			}
+			segment = append(segment, encoded...)
+		}
+		if mode == "unknown" {
+			out = append(out, []byte{0x18, 0x53, 0x80, 0x67, 1, 255, 255, 255, 255, 255, 255, 255}...)
+			out = append(out, segment...)
+		} else {
+			out = append(out, ebmlTestElement(root.id, segment)...)
+		}
+	}
+	return out
+}
+func TestWebMTrackPayloadAndUnknownLengths(t *testing.T) {
+	b := audioFixture(t, "silence.webm")
+	for _, mode := range []string{"no-audio", "no-blocks", "duration"} {
+		if validateAudio("audio/webm", webmTestVariant(t, b, mode)) == nil {
+			t.Fatalf("accepted %s", mode)
+		}
+	}
+	if err := validateAudio("audio/webm", webmTestVariant(t, b, "unknown")); err != nil {
+		t.Fatalf("unknown Segment/Cluster rejected: %v", err)
+	}
+}
+func TestAudioDeclaredBoundsAndDurations(t *testing.T) {
+	b := audioFixture(t, "silence.ogg")
+	last := bytes.LastIndex(b, []byte("OggS"))
+	page := b[last:]
+	binary.LittleEndian.PutUint64(page[6:14], 121*48000)
+	for i := 22; i < 26; i++ {
+		page[i] = 0
+	}
+	var crc uint32
+	for _, v := range page {
+		crc ^= uint32(v) << 24
+		for j := 0; j < 8; j++ {
+			if crc&0x80000000 != 0 {
+				crc = (crc << 1) ^ 0x04c11db7
+			} else {
+				crc <<= 1
+			}
+		}
+	}
+	binary.LittleEndian.PutUint32(page[22:26], crc)
+	if validateAudio("audio/ogg", b) == nil {
+		t.Fatal("accepted overlong Ogg granule")
+	}
+	b = audioFixture(t, "silence.mp4")
+	idx := bytes.Index(b, []byte("mdhd"))
+	if idx < 0 {
+		t.Fatal("missing mdhd")
+	}
+	p := b[idx+4:]
+	scale := u32(p[12:16])
+	binary.BigEndian.PutUint32(p[16:20], scale*121)
+	if validateAudio("audio/mp4", b) == nil {
+		t.Fatal("accepted overlong MP4 duration")
+	}
+	for _, name := range []string{"silence.mp4", "silence-fragmented.mp4"} {
+		b = audioFixture(t, name)
+		idx = bytes.Index(b, []byte("mdat"))
+		binary.BigEndian.PutUint32(b[idx-4:idx], uint32(len(b)+100))
+		if validateAudio("audio/mp4", b) == nil {
+			t.Fatal("accepted invalid MP4 box extent")
+		}
+	}
+	b = audioFixture(t, "silence.ogg")
+	b[len(b)-1] ^= 1
+	if validateAudio("audio/ogg", b) == nil {
+		t.Fatal("accepted corrupt Ogg checksum")
+	}
+}
+func TestWebMManyStreamingUnknownClusters(t *testing.T) {
+	b := audioFixture(t, "silence.webm")
+	roots, e := ebmlChildren(b, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var result []byte
+	for _, r := range roots {
+		if r.id != 0x18538067 {
+			result = append(result, ebmlTestElement(r.id, r.data)...)
+			continue
+		}
+		items, e := ebmlChildren(r.data, true)
+		if e != nil {
+			t.Fatal(e)
+		}
+		var segment []byte
+		for _, item := range items {
+			if item.id != 0x1f43b675 {
+				segment = append(segment, ebmlTestElement(item.id, item.data)...)
+				continue
+			}
+			vals, e := ebmlChildren(item.data, false)
+			if e != nil {
+				t.Fatal(e)
+			}
+			for i := 0; i < 8; i++ {
+				var payload []byte
+				for _, v := range vals {
+					if v.id == 0xe7 {
+						var ts [2]byte
+						binary.BigEndian.PutUint16(ts[:], uint16(i*250))
+						v.data = ts[:]
+					}
+					payload = append(payload, ebmlTestElement(v.id, v.data)...)
+				}
+				segment = append(segment, []byte{0x1f, 0x43, 0xb6, 0x75, 1, 255, 255, 255, 255, 255, 255, 255}...)
+				segment = append(segment, payload...)
+			}
+		}
+		result = append(result, []byte{0x18, 0x53, 0x80, 0x67, 1, 255, 255, 255, 255, 255, 255, 255}...)
+		result = append(result, segment...)
+	}
+	if err := validateAudio("audio/webm", result); err != nil {
+		t.Fatalf("eight legal streaming Clusters rejected: %v", err)
+	}
+}

@@ -22,3 +22,28 @@ body{margin:0;background:var(--z-bg);color:var(--z-text);font-family:Manrope,sys
 input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{-webkit-box-shadow:0 0 0 1000px var(--z-card) inset;-webkit-text-fill-color:var(--z-text);caret-color:var(--z-text)}
 .z-remote-audio{padding:12px;width:275px;max-height:290px;background:#141116eb;backdrop-filter:blur(20px);box-shadow:0 12px 35px #0004}.z-remote-audio>summary{font-size:11px}.z-audio-control{padding-top:10px}.z-audio-control audio{display:none}.z-audio-heading{display:flex;align-items:center;gap:10px}.z-audio-heading strong{display:block;font-size:12px;color:var(--z-text)}.z-audio-heading div>span{display:block;margin-top:3px;font-size:10px;color:var(--z-muted)}.z-audio-symbol{width:36px;height:36px;flex-shrink:0;display:grid;place-items:center;border-radius:12px;background:#ffffff08;color:var(--z-muted)}.z-audio-symbol.is-playing{background:#b7ff3912;color:var(--z-lime)}.z-audio-control .z-audio-retry{display:flex;gap:8px;justify-content:center;align-items:center;margin-top:14px;width:100%;border:1px solid var(--z-line);border-radius:12px;min-height:38px;font-size:11px;background:#ffffff06}.z-audio-details{margin-top:8px;color:var(--z-muted);font-size:10px;line-height:1.6}.z-audio-details p{margin-top:8px}.z-audio-diagnostics{position:absolute;z-index:8;top:90px;left:20px;max-width:290px;border:1px solid var(--z-line);border-radius:14px;background:#141116eb;padding:10px 14px;font-size:11px;color:var(--z-muted);backdrop-filter:blur(20px)}.z-audio-diagnostics summary{cursor:pointer;color:var(--z-text)}.z-audio-diagnostics p{margin:8px 0}.z-audio-diagnostics small{display:block;line-height:1.6}
 @media(max-width:720px){.z-remote-audio{width:min(260px,calc(100vw - 35px));bottom:180px}.z-audio-diagnostics{left:14px;top:82px;max-width:calc(100vw - 40px)}}
+/* Media extends the existing composer and profile surfaces. */
+.z-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.z-voice-composer{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;min-width:0}
+.z-voice-composer .notice{flex-basis:100%;margin:0}
+.z-voice-composer .z-icon{min-width:44px;min-height:44px}
+.z-voice-player{display:flex;flex-direction:column;gap:4px;min-width:0;max-width:100%}
+.z-voice-player audio{width:270px;max-width:100%;height:42px}
+.z-voice-player small{font-size:11px;opacity:.8}
+.z-recording{color:var(--z-pink);font-size:13px}
+.z-profile-photo{display:grid;gap:12px;max-width:340px;margin:16px auto;text-align:left}
+.z-profile-photo input{width:100%;min-width:0;font:inherit;font-size:12px}
+.z-photo-preview{width:96px;height:96px;object-fit:cover;border-radius:50%;margin:auto}
+.z-photo-actions{display:flex;gap:8px;flex-wrap:wrap}
+.z-profile-photo button{min-height:44px}
+@media(max-width:480px){.z-voice-player audio{width:220px}.z-voice-composer:has(audio) .z-voice-player{flex-basis:100%}.z-bubble .z-voice-player audio{width:210px}}
+
+/* Composer owns textarea geometry; resizing would obscure its actions. */
+.resize-none{resize:none}
+
+/* One composer surface: idle mic shares the text row; capture replaces it. */
+.z-composer>.z-voice-composer{margin:0;flex:0 1 auto}
+.z-composer:has(.z-voice-composer[data-active=true])>.z-composer-field,.z-composer:has(.z-voice-composer[data-active=true])>.z-text-send{display:none}
+.z-composer>.z-voice-composer[data-active=true]{flex:1;min-width:0}
+.z-composer>.z-voice-composer[data-phase=error]{flex-basis:100%;order:3}
+.z-composer:has(.z-voice-composer[data-phase=error]){flex-wrap:wrap}

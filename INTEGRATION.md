@@ -1,5 +1,15 @@
 # Zently visual layer for Zentry-Chat
 
+## Media feature branch (2026-11-06)
+
+The original visual-only scope below describes the initial integration. The user subsequently authorized persistent voice messages (up to two minutes) and optional profile photos. The `feat/voice-and-profile-photos` branch extends the original Go API and database for those capabilities, and includes the isolated call-audio repair from `fix/call-audio`.
+
+Voice flow: request microphone on explicit action, stop/preview/cancel/send, preserve failed draft and UUID for retry, display authenticated playback controls in message history. Capture stops on conversation navigation, hidden/mobile chat, call activation, cancellation and unmount. Photos support bounded JPEG/PNG upload, preview, replacement and removal; shared avatars fall back to account initials. Replacement uses versioned URLs.
+
+Media uses the existing database and cookie authentication. Apply migrations through the normal Go API startup, and deploy the API before the new client. Updating the Vercel client alone does not add these endpoints. The current Render configuration disables automatic API deployments; the owner must trigger that deployment.
+
+The implementation is local until a successful push/deployment is explicitly recorded. GitHub integration previously returned 403 for the friend's repository. Automated API tests use a local PostgreSQL database and synthetic accounts/media that clean themselves up. Encoded test media does not verify a physical microphone or cross-device audible calls.
+
 Base: alexey-panchenko-dev/Zentry-Chat at e6f6fe5d32a3820803e7797b9f91364c62c32526.
 
 ## Scope

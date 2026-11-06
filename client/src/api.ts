@@ -7,12 +7,15 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-export type User = { id: string; name: string }
+export type User = { id: string; name: string; avatar_url?: string }
 export type Conversation = { id: string; participant: User }
 export type Message = {
   id: string
   conversation_id: string
   sender_id: string
+  kind?: 'text' | 'voice'
+  audio_url?: string
+  duration_ms?: number
   body: string
   created_at: string
 }
@@ -22,6 +25,9 @@ export function errorText(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.error
     const labels: Record<string, string> = {
+      invalid_media: 'Файл не подходит. Проверьте формат и размер и повторите.',
+      invalid_voice: 'Не удалось принять запись. Запишите сообщение заново (до 2 минут и 3 МБ).',
+      invalid_photo: 'Не удалось принять фото. Выберите JPG или PNG до 2 МБ.',
       invalid_credentials: 'Неверная почта или пароль.',
       email_already_registered: 'Эта почта уже зарегистрирована.',
       unauthorized: 'Сессия закончилась. Войдите снова.',

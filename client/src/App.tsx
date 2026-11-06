@@ -1,5 +1,9 @@
+import { createMediaQueryStore } from './media-query'
+import { VoiceComposer } from '@/VoiceComposer'
+import { VoiceMessage } from '@/VoiceMessage'
+import { ProfilePhoto } from '@/ProfilePhoto'
 import { CallPanel } from '@/CallPanel'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Pusher from 'pusher-js'
@@ -47,6 +51,7 @@ function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [validation,setValidation]=useState<{field:string;message:string}|null>(null)
   const auth = useMutation({
     mutationFn: async () => {
       if (register) await api.post('/auth/register', { name, email, password })
@@ -54,18 +59,33 @@ function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
     },
     onSuccess: (user) => { cache.clear(); cache.setQueryData(['session'], user); onSessionViewChanged() },
   })
+  function submitAuth(event:FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if(auth.isPending)return
+    const form=event.currentTarget
+    const fields=Array.from(form.querySelectorAll('input'))
+    for(const field of fields){
+      let message=''
+      if(field.name==='name'&&(!field.value.trim()||field.value.length>100))message='Введите имя профиля от 1 до 100 символов.'
+      else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например you@example.com.'
+      else if(field.name==='password'&&(!field.checkValidity()||field.value.length<12||new TextEncoder().encode(field.value).length>72))message='Введите пароль от 12 символов, не более 72 байт.'
+      if(message){setValidation({field:field.name,message});field.focus();return}
+    }
+    setValidation(null);auth.mutate()
+  }
   return <section className="z-auth-card">
     <Brand/><p className="z-eyebrow">БЛИЖЕ ДРУГ К ДРУГУ</p><h1>{register ? <>Твой круг.<br/>Твои разговоры.</> : <>С возвращением<br/>в Zently.</>}</h1>
     <p className="z-muted">{register ? 'Создай профиль и будь на связи.' : 'Войди, чтобы продолжить разговор.'}</p>
-    <form className="z-auth-form" onSubmit={(event) => { event.preventDefault(); auth.mutate() }}>
-      {register && <label>Имя профиля<input required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Как к тебе обращаться" /></label>}
-      <label>Почта<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
-      <label>Пароль<input type="password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register ? 'new-password' : 'current-password'} placeholder="Не менее 12 символов" /></label>
+    <form noValidate className="z-auth-form" onSubmit={submitAuth}>
+      {register && <label>Имя профиля<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Как к тебе обращаться" /></label>}
+      <label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
+      <label>Пароль<input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type="password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register ? 'new-password' : 'current-password'} placeholder="Не менее 12 символов" /></label>
       <p className="z-field-help">От 12 до 72 байт. Латинские буквы и цифры.</p>
+      {validation&&<p id="auth-validation" className="notice" role="alert">{validation.message}</p>}
       {auth.isError && <p className="notice" role="alert">{errorText(auth.error)}{register && ' Если аккаунт уже создался, переключитесь на вход.'}</p>}
       <button className="primary" disabled={auth.isPending}>{auth.isPending ? 'Подождите…' : register ? 'Создать аккаунт' : 'Войти'}<ArrowLeft className="z-arrow-forward" size={18}/></button>
     </form>
-    <button className="z-auth-switch" onClick={() => { setRegister(!register); auth.reset() }}>{register ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Создать профиль'}</button>
+    <button className="z-auth-switch" onClick={() => { setRegister(!register); setValidation(null); auth.reset() }}>{register ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Создать профиль'}</button>
   </section>
 }
 
@@ -74,10 +94,14 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [selected, setSelected] = useState<Conversation | null>(null)
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
+  const [searchError,setSearchError]=useState('')
   const [uiSection, setUiSection] = useState<'chats'|'calls'|'settings'>('chats')
+  const [callActive,setCallActive]=useState(false)
   const [compact, setCompact] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [mobileChat, setMobileChat] = useState(false)
+  const [mobileLayout] = useState(()=>createMediaQueryStore(window.matchMedia('(max-width: 720px)')))
+  const isMobile = useSyncExternalStore(mobileLayout.subscribe,mobileLayout.getSnapshot)
   const [soundsEnabled,setSoundsEnabled] = useState(()=>localStorage.getItem('zently-call-sounds')!=='0')
   const dialogs = useInfiniteQuery({
     queryKey: ['conversations'], initialPageParam: '',
@@ -107,7 +131,8 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
       <button className="z-account" aria-label="Мой профиль" onClick={()=>{setUiSection('settings');setMobileChat(true)}}><Avatar user={user}/><span><strong>{user.name}</strong><small>Мой профиль</small></span></button>
     </aside>
     <aside className="z-dialogs"><div className="z-list-top"><span>Чаты</span><div><button className="z-icon" aria-label="Обновить переписки" onClick={()=>void dialogs.refetch()}><RefreshCw size={16}/></button><button className="z-icon" aria-label="Найти человека" onClick={()=>setSearchOpen(!searchOpen)}><Plus/></button></div></div>
-      <form className="z-search" onSubmit={(e)=>{e.preventDefault();setQuery(search.trim());setSearchOpen(true)}}><Search size={18}/><input aria-label="Поиск пользователя" placeholder="Имя или точная почта" value={search} onChange={e=>setSearch(e.target.value)} minLength={2} maxLength={100} required/>{search && <button type="button" className="z-clear" aria-label="Очистить поиск" onClick={()=>{setSearch('');setQuery('')}}>×</button>}<button className="z-icon" aria-label="Найти"><ArrowLeft size={16} className="z-arrow-forward"/></button></form>
+      <form noValidate className="z-search" onSubmit={(e)=>{e.preventDefault();const input=e.currentTarget.querySelector('input')!;const text=search.trim();if(!input.checkValidity()||text.length<2||text.length>100){setSearchError('Введите имя или почту от 2 до 100 символов.');input.focus();return}setSearchError('');setQuery(text);setSearchOpen(true)}}><Search size={18}/><input aria-invalid={!!searchError} aria-describedby={searchError?'search-validation':undefined} aria-label="Поиск пользователя" placeholder="Имя или точная почта" value={search} onChange={e=>{setSearch(e.target.value);setSearchError('')}} minLength={2} maxLength={100} required/>{search && <button type="button" className="z-clear" aria-label="Очистить поиск" onClick={()=>{setSearch('');setQuery('');setSearchError('')}}>×</button>}<button className="z-icon" aria-label="Найти"><ArrowLeft size={16} className="z-arrow-forward"/></button></form>
+      {searchError&&<p id="search-validation" className="notice" role="alert">{searchError}</p>}
       {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}</span><MessageCircle size={17}/></button>)}</div>}
       {create.isError&&<p className="notice">{errorText(create.error)}</p>}
       <div className="z-conversation-list">{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
@@ -118,16 +143,16 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
-      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user}/></div>}
-      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p></div><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
+      {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive}/></div>}
+      {uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><div className="z-profile"><Avatar user={user} large/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p><ProfilePhoto user={user}/></div><label className="z-setting-row">Компактное меню<input type="checkbox" checked={compact} onChange={e=>setCompact(e.target.checked)}/></label><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
       :uiSection==='calls'?<section className="z-call-lobby"><Phone size={40}/><h1>Ближе голосом</h1><p className="z-muted">{selected?'Начни видеозвонок с '+selected.participant.name:'Выбери переписку, чтобы позвонить.'}</p><p className="z-field-help">Кнопка звонка появится, когда выберешь собеседника.</p></section>
       :!selected?<div className="z-empty"><MessageCircle size={46}/><h1>На одной волне</h1><p>Выбери разговор или найди человека,<br/>с которым хочешь быть на связи.</p></div>:null}
     </div>
-    <CallPanel user={user} selected={selected} soundsEnabled={soundsEnabled} conversations={dialogs.data?.pages.flatMap(page=>page.conversations)||[]}/>
+    <CallPanel onActiveChange={setCallActive} user={user} selected={selected} soundsEnabled={soundsEnabled} conversations={dialogs.data?.pages.flatMap(page=>page.conversations)||[]}/>
   </div>
 }
 
-function Messages({ conversation, user }: { conversation: Conversation; user: User }) {
+function Messages({ conversation, user, visible, callActive }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean }) {
   const cache = useQueryClient()
   const [body, setBody] = useState('')
   const [status, setStatus] = useState('Подключаемся…')
@@ -210,10 +235,10 @@ function Messages({ conversation, user }: { conversation: Conversation; user: Us
       {history.hasNextPage&&<button className="secondary z-older" disabled={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}>Более ранние сообщения</button>}
       {history.isPending&&<p className="z-empty-copy" role="status">Загружаем историю…</p>}{history.isError&&<p className="notice">{errorText(history.error)}</p>}
       {!history.isPending&&!history.isError&&messages.length===0&&<div className="z-empty-copy"><p>Начни разговор</p><small>Напиши первое сообщение.</small></div>}
-      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><p>{message.body}</p><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&<Check size={16} aria-label="Сохранено на сервере"/>}</div></div></div>)}<div ref={bottom}/>
+      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&<Check size={16} aria-label="Сохранено на сервере"/>}</div></div></div>)}<div ref={bottom}/>
     </div>
-    <form className="z-composer-region" onSubmit={submit}>{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
-      <div className="z-composer"><div className="z-composer-field"><textarea aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><button className="z-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending}><Send size={23}/></button></div>
+    <form noValidate className="z-composer-region" onSubmit={submit}>{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
+      <div className="z-composer"><div className="z-composer-field"><textarea className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));setDelivery(result.realtime==='published'?'Голосовое сообщение сохранено.':'Запись сохранена. Собеседнику может понадобиться обновить историю.')}}/><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending}><Send size={23}/></button></div>
       <details className="z-connection"><summary><Wifi size={11}/>{send.isPending?'Отправляем…':'Состояние соединения'}</summary><p role="status">{status}</p><p>Получено событий: {events}. {delivery||'До 1000 символов. Enter — отправить, Shift+Enter — новая строка.'}</p></details>
     </form>
   </section>

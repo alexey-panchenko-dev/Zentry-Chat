@@ -26,7 +26,7 @@ function VideoStream({ stream, muted = false, label }: { stream: MediaStream | n
     {!muted && <details className="z-remote-audio"><summary>Звук собеседника</summary><RemoteAudio stream={stream} /></details>}
   </div>
 }
-export function CallPanel({ user, selected, conversations = [], soundsEnabled = true }: { user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
+export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange }: { onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
   const callDialog = useRef<HTMLDialogElement>(null)
   const [sounds] = useState(()=>new CallSounds({enabled:soundsEnabled}))
   const [soundBlocked,setSoundBlocked] = useState(false)
@@ -45,6 +45,7 @@ export function CallPanel({ user, selected, conversations = [], soundsEnabled = 
   }, [user.id])
   const call = view.call
   const ongoing = call?.status === 'ringing' || call?.status === 'accepted'
+  useEffect(()=>{onActiveChange?.(!!ongoing || view.busy);return()=>onActiveChange?.(false)},[ongoing,view.busy,onActiveChange])
   const incoming = call?.callee_id === user.id
   useEffect(()=>{let active=true;if(call?.status==='ringing'&&soundsEnabled){const audible=sounds.play(incoming?'incoming':'outgoing');void Promise.resolve(audible).then(ok=>{if(active)setSoundBlocked(!ok)})}else sounds.stop();return()=>{active=false;sounds.stop()}},[call?.id,call?.status,incoming,soundsEnabled,sounds])
   const callPeer = call ? conversations.find(c => c.id === call.conversation_id)?.participant : selected?.participant

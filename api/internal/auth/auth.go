@@ -21,6 +21,7 @@ var ErrSession = errors.New("invalid session")
 const SessionTTL = 7 * 24 * time.Hour
 
 type User struct {
+	AvatarURL string    `json:"avatar_url,omitempty"`
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	Email     string    `json:"email"`
@@ -59,8 +60,8 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (U
 func (s *Service) Login(ctx context.Context, email, password string) (User, string, time.Time, error) {
 	var u User
 	var hash string
-	err := s.db.QueryRow(ctx, `SELECT id::text,name,email,created_at,password_hash FROM users WHERE email=$1`, email).
-		Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &hash)
+	err := s.db.QueryRow(ctx, `SELECT id::text,name,email,created_at,password_hash,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE email=$1`, email).
+		Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &hash, &u.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(password))
 		return User{}, "", time.Time{}, ErrCredentials
@@ -88,9 +89,9 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (User, error) {
 	}
 	digest := sha256.Sum256([]byte(token))
 	var u User
-	err := s.db.QueryRow(ctx, `SELECT u.id::text,u.name,u.email,u.created_at
+	err := s.db.QueryRow(ctx, `SELECT u.id::text,u.name,u.email,u.created_at,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'')
 		FROM sessions s JOIN users u ON u.id=s.user_id
-		WHERE s.token_hash=$1 AND s.expires_at>now()`, digest[:]).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt)
+		WHERE s.token_hash=$1 AND s.expires_at>now()`, digest[:]).Scan(&u.ID, &u.Name, &u.Email, &u.CreatedAt, &u.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrSession
 	}

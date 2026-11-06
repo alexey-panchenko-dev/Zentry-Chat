@@ -21,6 +21,11 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	}
 	ch := &chatHandlers{store: chat.New(db), auth: h.service, publisher: publisher}
 	chatMux := http.NewServeMux()
+	chatMux.HandleFunc("POST /api/conversations/{id}/voice", ch.signedIn(ch.sendVoice))
+	chatMux.HandleFunc("GET /api/messages/{messageID}/audio", ch.signedIn(ch.audio))
+	chatMux.HandleFunc("POST /api/profile/photo", ch.signedIn(ch.setPhoto))
+	chatMux.HandleFunc("DELETE /api/profile/photo", ch.signedIn(ch.deletePhoto))
+	chatMux.HandleFunc("GET /api/profiles/{userID}/photo", ch.signedIn(ch.photo))
 	callHandlers := &callHandlers{store: calls.New(db), publisher: publisher}
 	chatMux.HandleFunc("POST /api/conversations/{id}/calls", ch.signedIn(callHandlers.create))
 	chatMux.HandleFunc("GET /api/calls", ch.signedIn(callHandlers.active))
@@ -36,7 +41,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
 	protectedChat := protectAPI(chatMux, 120)
-	for _, pattern := range []string{"/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()
