@@ -194,3 +194,24 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 /* Keep header actions clear of the call button, which sits above the chat. */
 .z-messages:not(.z-group-view)>.z-chat-header{padding-right:82px}
 @media(max-width:720px){.z-messages:not(.z-group-view)>.z-chat-header{padding-right:53px;gap:5px}}
+
+/* Chat photos keep their source orientation instead of filling a 4:3 canvas. */
+.z-image-message{width:min(280px,calc(320px * var(--photo-ratio,1)));max-width:100%}
+.z-message-image-button{width:100%;max-width:100%;background:transparent}
+.z-message-image-button img{width:100%;height:auto;max-width:100%;max-height:none;aspect-ratio:auto;object-fit:contain}
+@media(max-width:480px){.z-image-message{width:min(220px,calc(290px * var(--photo-ratio,1)))}.z-message-image-button{width:100%}}
+.z-bubble:has(.z-image-message){padding:4px 4px 6px;min-width:0}
+.z-bubble:has(.z-image-message) .z-message-meta{margin:4px 7px 0}
+
+.z-contact-identity{margin:-12px 0 0;color:var(--z-muted);font-size:12px}.z-contact-presence{display:flex;align-items:center;gap:7px;margin:-10px 0 0;color:var(--z-muted);font-size:11px}.z-contact-presence span{width:8px;height:8px;border-radius:50%;background:#77727c}.z-contact-presence span.is-online{background:var(--z-lime);box-shadow:0 0 8px #b7ff3980}
+.z-message-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-self:stretch}.z-message-counts>div{display:grid;gap:4px;padding:13px 16px;border:1px solid #ff14932a;border-radius:16px;background:#ff14930b}.z-message-counts strong{font-size:20px}.z-message-counts span{font-size:11px;color:var(--z-muted)}
+.z-contact-alias,.z-username-editor{display:grid;gap:10px;align-self:stretch;width:100%}.z-contact-alias label,.z-username-editor label{display:grid;gap:8px;font-size:12px}.z-contact-alias input,.z-username-editor input{min-height:44px;padding:10px 14px}.z-contact-alias button,.z-username-editor button{justify-self:start}.z-username-editor{margin:18px 0 24px}.z-username-editor .z-field-help{margin:0}
+.z-search-results .z-contact>span:nth-child(2){display:grid;gap:3px}.z-search-results .z-contact small{font-size:10px;color:var(--z-muted)}
+
+/* Match the photo corners to the bubble and give messages a clearer direction. */
+.z-bubble-row.is-own .z-bubble{border-radius:18px 18px 5px 18px}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{border-radius:18px 18px 18px 5px}
+.z-bubble:has(.z-image-message){border-radius:18px 18px 5px 18px}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:has(.z-image-message){border-radius:18px 18px 18px 5px}
+.z-bubble-row.is-own .z-message-image-button{border-radius:14px 14px 3px 14px}
+.z-bubble-row:not(.is-own) .z-message-image-button{border-radius:14px 14px 14px 3px}

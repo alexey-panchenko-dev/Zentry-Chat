@@ -164,6 +164,55 @@ func TestContactProfilePrivacyAndEditing(t *testing.T) {
 	if string(persisted["phone"]) != `""` || string(persisted["show_phone"]) != "false" {
 		t.Fatalf("remove not persisted %s", persisted)
 	}
+	if got := profile(); string(got["sent_count"]) != "0" || string(got["received_count"]) != "0" || string(got["online"]) != "false" {
+		t.Fatalf("initial contact stats: %s", got)
+	}
+	request(1, "POST", "/api/presence", `{}`, 200)
+	if got := profile(); string(got["online"]) != "true" {
+		t.Fatalf("presence missing: %s", got)
+	}
+	if _, err := db.Exec(ctx, `UPDATE user_presence SET last_seen=now()-interval '2 minutes' WHERE user_id=$1`, users[1].ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := profile(); string(got["online"]) != "false" {
+		t.Fatalf("expired presence visible: %s", got)
+	}
+	if _, _, err := store.Send(ctx, conv.ID, users[0].ID, "30000000-0000-0000-0000-000000000001", "one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.Send(ctx, conv.ID, users[1].ID, "30000000-0000-0000-0000-000000000002", "two"); err != nil {
+		t.Fatal(err)
+	}
+	if got := profile(); string(got["sent_count"]) != "1" || string(got["received_count"]) != "1" {
+		t.Fatalf("message counts: %s", got)
+	}
+	if _, err := store.ChangeControls(ctx, conv.ID, users[0].ID, "clear"); err != nil {
+		t.Fatal(err)
+	}
+	if got := profile(); string(got["sent_count"]) != "0" || string(got["received_count"]) != "0" {
+		t.Fatalf("cleared counts: %s", got)
+	}
+	request(2, "PUT", "/api/conversations/"+conv.ID+"/alias", `{"alias":"Чужой"}`, 404)
+	request(0, "PUT", "/api/conversations/"+conv.ID+"/alias", `{"alias":"Друг"}`, 200)
+	if got := profile(); string(got["display_name"]) != `"Друг"` {
+		t.Fatalf("private alias missing: %s", got)
+	}
+	other := request(1, "GET", peer, "", 200)
+	if strings.Contains(string(other["profile"]), "Друг") {
+		t.Fatalf("alias leaked to peer: %s", other)
+	}
+	request(0, "PUT", "/api/conversations/"+conv.ID+"/alias", `{"alias":""}`, 200)
+	if got := profile(); got["display_name"] != nil {
+		t.Fatalf("alias not removed: %s", got)
+	}
+	username := fmt.Sprintf("member_%d", time.Now().UnixNano())
+	request(1, "PUT", "/api/profile/username", fmt.Sprintf(`{"username":%q}`, username), 200)
+	request(0, "PUT", "/api/profile/username", fmt.Sprintf(`{"username":%q}`, username), 409)
+	request(0, "PUT", "/api/profile/username", `{"username":"bad name"}`, 400)
+	results := request(0, "GET", "/api/users?query=@"+strings.ToUpper(username), "", 200)
+	if !strings.Contains(string(results["users"]), username) {
+		t.Fatalf("username search failed: %s", results)
+	}
 	capabilities := request(0, "GET", "/api/realtime/config", "", 200)
 	var media map[string]bool
 	json.Unmarshal(capabilities["media"], &media)

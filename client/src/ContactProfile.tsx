@@ -4,12 +4,12 @@ import { blockNotice, isRemovalAction, removalCommitted } from './conversation-c
 import type { ControlAction, RemovalAction } from './conversation-controls'
 import type { ConversationControlView } from './useConversationControls'
 import { useEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MoreHorizontal, Phone, X } from 'lucide-react'
 import { api, errorText } from '@/api'
 import type { Conversation, User } from '@/api'
 import { Avatar } from '@/Visual'
-type PeerProfile=User&{phone?:string;birthday?:string}
+export type PeerProfile=User&{phone?:string;birthday?:string;sent_count?:number;received_count?:number;online?:boolean;display_name?:string}
 const actionLabel:Record<ControlAction,string>={clear:'Очистить историю',delete_chat:'Удалить чат',remove_contact:'Удалить контакт',block:'Заблокировать',unblock:'Разблокировать'}
 const actionDescription:Record<ControlAction,string>={
  clear:'Очистить историю этой переписки только у вас? У собеседника сообщения сохранятся.',
@@ -19,6 +19,7 @@ const actionDescription:Record<ControlAction,string>={
  unblock:'Разблокировать контакт и снова разрешить сообщения и звонки?',
 }
 export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=false,controls}:{conversation:Conversation;onClose:()=>void;onCall:()=>void;onRemoved:(id:string,action:RemovalAction)=>void;callBusy?:boolean;controls:ConversationControlView}) {
+ const cache=useQueryClient()
  const dialog=useRef<HTMLDialogElement>(null)
  const menu=useRef<HTMLDetailsElement>(null)
  const backdropPress=useRef(false)
@@ -27,7 +28,10 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  const previousConfirmation=useRef<ControlAction|null>(null)
  const [enlarged,setEnlarged]=useState(false)
  const [failedPhoto,setFailedPhoto]=useState('')
+ const [aliasDraft,setAliasDraft]=useState<string|null>(null)
  const profile=useQuery({queryKey:['contact-profile',conversation.id],queryFn:async({signal})=>(await api.get<{profile:PeerProfile}>(`/conversations/${conversation.id}/profile`,{signal})).data.profile,retry:false})
+ const alias=aliasDraft??profile.data?.display_name??conversation.display_name??''
+ const saveAlias=useMutation({mutationFn:async()=> (await api.put<{alias:string}>(`/conversations/${conversation.id}/alias`,{alias:alias.trim()})).data.alias,onSuccess:next=>{setAliasDraft(null);cache.setQueryData<PeerProfile>(['contact-profile',conversation.id],old=>old?{...old,display_name:next}:old);void cache.invalidateQueries({queryKey:['conversations']})}})
  useEffect(()=>{const element=dialog.current;element?.showModal();return()=>element?.close()},[])
  useEffect(()=>{
   const outside=(event:PointerEvent)=>{const element=menu.current;if(element?.open&&event.target instanceof Node&&!element.contains(event.target))element.open=false}
@@ -48,7 +52,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  async function confirmAction(){
   if(!confirmation||controls.action.isPending)return
   const action=confirmation;const id=conversation.id
-  try{const state=await controls.action.mutateAsync({value:action,id});if(isRemovalAction(action)&&removalCommitted(action,state)){close();onRemoved(id,action);return}setCompleted(action==='block'?'Контакт заблокирован.':action==='unblock'?'Контакт разблокирован.':'Изменения сохранены.');setConfirmation(null)}catch{/* Keep the confirmation and its request error for retry. */}
+  try{const state=await controls.action.mutateAsync({value:action,id});void cache.invalidateQueries({queryKey:['contact-profile',id]});if(isRemovalAction(action)&&removalCommitted(action,state)){close();onRemoved(id,action);return}setCompleted(action==='block'?'Контакт заблокирован.':action==='unblock'?'Контакт разблокирован.':'Изменения сохранены.');setConfirmation(null)}catch{/* Keep the confirmation and its request error for retry. */}
  }
  return createPortal(<dialog ref={dialog} className="z-contact-dialog" aria-labelledby="contact-profile-title" onPointerDown={event=>{const rect=event.currentTarget.getBoundingClientRect();backdropPress.current=event.target===event.currentTarget&&(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)}} onPointerCancel={()=>{backdropPress.current=false}} onClick={event=>{const startedOutside=backdropPress.current;backdropPress.current=false;if(!startedOutside||event.target!==event.currentTarget||controls.action.isPending)return;const rect=event.currentTarget.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)close()}} onCancel={event=>{
   event.preventDefault();if(controls.action.isPending)return
@@ -62,11 +66,13 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  </div></details>}
  <button type="button" className="z-icon" aria-label="Закрыть профиль" autoFocus disabled={controls.action.isPending} onClick={close}><X/></button></div></div>
  {confirmation?<div className="z-contact-confirm"><p>{actionDescription[confirmation]}</p>{controls.action.isError&&<p className="notice" role="alert">{errorText(controls.action.error)}</p>}<button type="button" className="secondary" autoFocus disabled={controls.action.isPending} onClick={()=>setConfirmation(null)}>Отмена</button><button type="button" className="primary" disabled={controls.action.isPending} onClick={()=>void confirmAction()}>{controls.action.isPending?'Сохраняем…':actionLabel[confirmation]}</button></div>:<div className="z-contact-profile-body">
- {photo?<button type="button" className={'z-profile-image-button'+(enlarged?' is-enlarged':'')} aria-label={enlarged?'Уменьшить фото':'Увеличить фото'} aria-expanded={enlarged} onClick={()=>setEnlarged(value=>!value)}><img src={photo} alt={'Фото '+peer.name} onError={()=>setFailedPhoto(photo)}/></button>:<Avatar user={{...peer,avatar_url:''}} large/>}<h3>{peer.name}</h3>
+ {photo?<button type="button" className={'z-profile-image-button'+(enlarged?' is-enlarged':'')} aria-label={enlarged?'Уменьшить фото':'Увеличить фото'} aria-expanded={enlarged} onClick={()=>setEnlarged(value=>!value)}><img src={photo} alt={'Фото '+peer.name} onError={()=>setFailedPhoto(photo)}/></button>:<Avatar user={{...peer,avatar_url:''}} large/>}<h3>{peer.display_name||peer.name}</h3><p className="z-contact-identity">{peer.display_name&&<span>{peer.name} · </span>}@{peer.username||'—'}</p>{profile.data&&<p className="z-contact-presence"><span className={peer.online?'is-online':''}/>{peer.online?'В сети':'Не в сети'}</p>}
  {profile.isFetching&&<p role="status" className="z-muted">Загружаем профиль…</p>}
  {profile.isError&&<div role="alert"><p className="notice">{oldServer?'Дополнительные сведения профиля пока недоступны.':errorText(profile.error)}</p><button type="button" className="secondary" onClick={()=>void profile.refetch()} disabled={profile.isFetching}>Повторить</button></div>}
  {profile.data&&!profile.isFetching&&!profile.isError&&<><dl className="z-contact-details">{peer.phone&&<><dt>Телефон</dt><dd>{peer.phone}</dd></>}</dl>{!peer.phone&&<p className="z-muted">Собеседник не открыл контактные данные.</p>}</>}
  {profile.data&&!profile.isFetching&&!profile.isError&&<dl className="z-contact-details"><dt>День рождения</dt><dd>{birthday?birthday.label:'Не указан'}{birthday?.today&&<strong className="z-birthday-today"> · Сегодня 🎉</strong>}</dd></dl>}
+ {profile.data&&!profile.isError&&<div className="z-message-counts"><div><strong>{peer.sent_count??0}</strong><span>Вы отправили</span></div><div><strong>{peer.received_count??0}</strong><span>Вам отправили</span></div></div>}
+ <form className="z-contact-alias" onSubmit={event=>{event.preventDefault();if(!saveAlias.isPending)saveAlias.mutate()}}><label>Имя в моих контактах<input value={alias} maxLength={80} placeholder={peer.name} onChange={event=>setAliasDraft(event.target.value)}/></label><button type="submit" className="secondary" disabled={saveAlias.isPending||alias.trim()===(profile.data?.display_name||'')}>Сохранить имя</button>{saveAlias.isError&&<p className="notice" role="alert">{errorText(saveAlias.error)}</p>}{saveAlias.isSuccess&&<p role="status">Имя сохранено только для вас.</p>}</form>
  {notice&&<p className="notice" role="status">{notice}</p>}
  <button type="button" className="primary" disabled={callBusy||controls.blocked||controls.unavailable} onClick={()=>{close();onCall()}}><Phone size={19}/>Позвонить</button>{callBusy&&<p className="z-field-help">Сначала завершите текущий звонок.</p>}
  {controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<div><p className="notice" role="alert">{errorText(controls.error)}</p><button className="secondary" type="button" onClick={()=>void controls.refetch()}>Повторить</button></div>}{completed&&<p role="status">{completed}</p>}

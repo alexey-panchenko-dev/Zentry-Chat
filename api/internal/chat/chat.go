@@ -16,12 +16,14 @@ var ErrConflict = errors.New("client message id already used")
 type PublicUser struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
+	Username  string `json:"username"`
 	AvatarURL string `json:"avatar_url,omitempty"`
 }
 
 type Conversation struct {
 	ID          string     `json:"id"`
 	Participant PublicUser `json:"participant"`
+	DisplayName string     `json:"display_name,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	Position    string     `json:"-"`
 	UnreadCount int        `json:"unread_count"`
@@ -45,8 +47,8 @@ type Store struct{ db *pgxpool.Pool }
 func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 func (s *Store) SearchUsers(ctx context.Context, userID, query string) ([]PublicUser, error) {
-	rows, err := s.db.Query(ctx, `SELECT id::text,name,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users
-        WHERE id<>$1 AND (strpos(lower(name),lower($2))>0 OR email=lower($2))
+	rows, err := s.db.Query(ctx, `SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users
+		WHERE id<>$1 AND (strpos(lower(name),lower($2))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
         ORDER BY lower(name),id LIMIT 20`, userID, query)
 	if err != nil {
 		return nil, err
@@ -55,7 +57,7 @@ func (s *Store) SearchUsers(ctx context.Context, userID, query string) ([]Public
 	result := make([]PublicUser, 0)
 	for rows.Next() {
 		var u PublicUser
-		if err := rows.Scan(&u.ID, &u.Name, &u.AvatarURL); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.AvatarURL); err != nil {
 			return nil, err
 		}
 		result = append(result, u)
@@ -73,7 +75,7 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 		return Conversation{}, err
 	}
 	var peer PublicUser
-	err = tx.QueryRow(ctx, "SELECT id::text,name,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE id=$1 FOR KEY SHARE", peerID).Scan(&peer.ID, &peer.Name, &peer.AvatarURL)
+	err = tx.QueryRow(ctx, "SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE id=$1 FOR KEY SHARE", peerID).Scan(&peer.ID, &peer.Name, &peer.Username, &peer.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Conversation{}, ErrNotFound
 	}
@@ -102,9 +104,10 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
+		LEFT JOIN contact_aliases a ON a.owner_id=$1 AND a.peer_id=u.id
         WHERE m.user_id=$1 AND NOT m.hidden AND ($2::bigint=0 OR c.position<$2)
         ORDER BY c.position DESC LIMIT $3`, userID, before, limit)
 	if err != nil {
@@ -114,7 +117,7 @@ func (s *Store) Conversations(ctx context.Context, userID string, before int64, 
 	result := make([]Conversation, 0)
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.AvatarURL, &c.UnreadCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.UnreadCount); err != nil {
 			return nil, err
 		}
 		result = append(result, c)

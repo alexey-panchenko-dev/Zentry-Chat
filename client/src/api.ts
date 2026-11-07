@@ -7,8 +7,8 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-export type User = { id: string; name: string; avatar_url?: string }
-export type Conversation = { id: string; participant: User; unread_count?: number }
+export type User = { id: string; name: string; username?: string; avatar_url?: string }
+export type Conversation = { id: string; participant: User; display_name?:string; unread_count?: number }
 export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string }
 export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string; peer_last_delivered_id?:string }
 export type Message = {
@@ -38,6 +38,9 @@ export function errorText(error: unknown): string {
       invalid_photo: 'Не удалось сохранить фото. Выберите другой JPG или PNG.',
       invalid_credentials: 'Неверная почта или пароль.',
       email_already_registered: 'Эта почта уже зарегистрирована.',
+      username_taken: 'Этот @юзер уже занят. Выберите другой.',
+      invalid_username: 'От 3 до 40 символов: латиница, цифры и _; первый символ — буква.',
+      invalid_alias: 'Имя контакта должно быть не длиннее 80 символов.',
       unauthorized: 'Сессия закончилась. Войдите снова.',
       rate_limit_exceeded: 'Слишком много запросов. Подождите минуту.',
     }

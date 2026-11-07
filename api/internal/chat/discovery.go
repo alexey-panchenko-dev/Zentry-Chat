@@ -18,11 +18,11 @@ type Profile struct {
 	City string `json:"city"`
 }
 
-const profileColumns = `u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),CASE WHEN p.birth_date IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE,p.birth_date))::integer ELSE p.age END,COALESCE(p.bio,''),COALESCE(p.city,'')`
+const profileColumns = `u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),CASE WHEN p.birth_date IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE,p.birth_date))::integer ELSE p.age END,COALESCE(p.bio,''),COALESCE(p.city,'')`
 
 func scanProfile(row pgx.Row) (Profile, error) {
 	var p Profile
-	err := row.Scan(&p.ID, &p.Name, &p.AvatarURL, &p.Age, &p.Bio, &p.City)
+	err := row.Scan(&p.ID, &p.Name, &p.Username, &p.AvatarURL, &p.Age, &p.Bio, &p.City)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}

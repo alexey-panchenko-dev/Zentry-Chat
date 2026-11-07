@@ -15,8 +15,39 @@ type ContactSettings struct {
 type ContactProfile struct {
 	Birthday string `json:"birthday,omitempty"`
 	PublicUser
-	Phone string `json:"phone,omitempty"`
-	Email string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
+	Email         string `json:"email,omitempty"`
+	SentCount     int64  `json:"sent_count"`
+	ReceivedCount int64  `json:"received_count"`
+	Online        bool   `json:"online"`
+	DisplayName   string `json:"display_name,omitempty"`
+}
+
+func (s *Store) TouchPresence(ctx context.Context, userID string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO user_presence(user_id,last_seen) VALUES($1,now()) ON CONFLICT(user_id) DO UPDATE SET last_seen=now()`, userID)
+	return err
+}
+
+func (s *Store) SetContactAlias(ctx context.Context, conversationID, userID, alias string) (string, error) {
+	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
+		return "", err
+	}
+	var saved string
+	err := s.db.QueryRow(ctx, `WITH peer AS (SELECT CASE WHEN c.user_low=$2 THEN c.user_high ELSE c.user_low END AS id FROM conversations c WHERE c.id=$1) INSERT INTO contact_aliases(owner_id,peer_id,alias) SELECT $2,id,$3 FROM peer ON CONFLICT(owner_id,peer_id) DO UPDATE SET alias=EXCLUDED.alias RETURNING alias`, conversationID, userID, alias).Scan(&saved)
+	return saved, err
+}
+
+func (s *Store) ClearContactAlias(ctx context.Context, conversationID, userID string) error {
+	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
+		return err
+	}
+	_, err := s.db.Exec(ctx, `DELETE FROM contact_aliases WHERE owner_id=$2 AND peer_id=(SELECT CASE WHEN c.user_low=$2 THEN c.user_high ELSE c.user_low END FROM conversations c WHERE c.id=$1)`, conversationID, userID)
+	return err
+}
+
+func (s *Store) SetUsername(ctx context.Context, userID, username string) error {
+	_, err := s.db.Exec(ctx, `UPDATE users SET username=$2 WHERE id=$1`, userID, username)
+	return err
 }
 
 func (s *Store) ContactSettings(ctx context.Context, userID string) (ContactSettings, error) {
@@ -39,7 +70,7 @@ func (s *Store) SetContactSettings(ctx context.Context, userID, phone string, sh
 }
 func (s *Store) ContactProfile(ctx context.Context, conversationID, userID string) (ContactProfile, error) {
 	var v ContactProfile
-	err := s.db.QueryRow(ctx, `SELECT u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||ph.revision::text FROM profile_photos ph WHERE ph.user_id=u.id),''),CASE WHEN p.show_phone THEN p.phone ELSE '' END,''::text,COALESCE(to_char(d.birth_date,'MM-DD'),'') FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id JOIN users u ON u.id=CASE WHEN c.user_low=$2 THEN c.user_high ELSE c.user_low END LEFT JOIN profile_contacts p ON p.user_id=u.id LEFT JOIN user_profiles d ON d.user_id=u.id WHERE m.conversation_id=$1 AND m.user_id=$2`, conversationID, userID).Scan(&v.ID, &v.Name, &v.AvatarURL, &v.Phone, &v.Email, &v.Birthday)
+	err := s.db.QueryRow(ctx, `SELECT u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||ph.revision::text FROM profile_photos ph WHERE ph.user_id=u.id),''),CASE WHEN p.show_phone THEN p.phone ELSE '' END,''::text,COALESCE(to_char(d.birth_date,'MM-DD'),''),COALESCE(stats.sent_count,0),COALESCE(stats.received_count,0),COALESCE((SELECT last_seen > now()-interval '75 seconds' FROM user_presence WHERE user_id=u.id),false),COALESCE(a.alias,'') FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id JOIN users u ON u.id=CASE WHEN c.user_low=$2 THEN c.user_high ELSE c.user_low END LEFT JOIN profile_contacts p ON p.user_id=u.id LEFT JOIN user_profiles d ON d.user_id=u.id LEFT JOIN contact_aliases a ON a.owner_id=$2 AND a.peer_id=u.id LEFT JOIN LATERAL (SELECT count(*) FILTER (WHERE sender_id=$2) AS sent_count,count(*) FILTER (WHERE sender_id=u.id) AS received_count FROM messages WHERE conversation_id=m.conversation_id AND id>m.cleared_through) stats ON true WHERE m.conversation_id=$1 AND m.user_id=$2`, conversationID, userID).Scan(&v.ID, &v.Name, &v.Username, &v.AvatarURL, &v.Phone, &v.Email, &v.Birthday, &v.SentCount, &v.ReceivedCount, &v.Online, &v.DisplayName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}

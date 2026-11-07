@@ -34,6 +34,9 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/profile/contact", ch.signedIn(ch.getContactSettings))
 	chatMux.HandleFunc("POST /api/profile/contact", ch.signedIn(ch.setContactSettings))
 	chatMux.HandleFunc("GET /api/conversations/{id}/profile", ch.signedIn(ch.getContactProfile))
+	chatMux.HandleFunc("PUT /api/conversations/{id}/alias", ch.signedIn(ch.setContactAlias))
+	chatMux.HandleFunc("PUT /api/profile/username", ch.signedIn(ch.setUsername))
+	chatMux.HandleFunc("POST /api/presence", ch.signedIn(ch.touchPresence))
 	chatMux.HandleFunc("GET /api/profile", ch.signedIn(ch.getProfile))
 	chatMux.HandleFunc("PUT /api/profile", ch.signedIn(ch.updateProfile))
 	chatMux.HandleFunc("GET /api/discovery", ch.signedIn(ch.discovery))
@@ -64,7 +67,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
 	protectedChat := protectAPI(chatMux, 120)
-	for _, pattern := range []string{"/api/groups", "/api/groups/", "/api/delivery", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()

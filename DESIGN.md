@@ -58,3 +58,8 @@ The approved ambient canvas extends through settings, discovery, authentication 
 The birth date field in the own profile is compact rather than spanning the full editor. An adjacent confirmation action appears enabled only when the date changes; it uses the profile's existing validated save path.
 The message composer floats directly on the continuous chat canvas. Conversation history reserves scroll space behind its controls, while connection diagnostics live in a small header disclosure instead of a visible footer strip.
 Direct chat headers reserve space at the trailing edge for the separately positioned call action, including narrow mobile widths; the connection disclosure and history action never occupy that same area.
+
+## Current chat refinements
+Photo messages retain their source aspect ratio on desktop and mobile, with a narrow pink frame. The frame and image have matching directional corners; text bubbles also use a sharper corner toward their sender. Direct chat headers show the peer's online state from a short presence heartbeat; unavailable status is distinguished from offline. The refresh and call controls stay aligned and the old Wi-Fi diagnostics control is removed.
+
+Contact profiles show sent and received counts from the viewer's visible history, plus the peer's real name and unique @username. A private contact alias changes only the viewer's chat list and heading. Existing accounts receive unique generated @usernames during migration; owners can change them, and search matches them without case sensitivity.

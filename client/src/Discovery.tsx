@@ -16,7 +16,15 @@ export function ProfileEditor({ user }: { user: User }) {
   const profile = useProfile()
   if (profile.isPending) return <p role="status">Загружаем профиль…</p>
   if (profile.isError) return <p className="notice">{errorText(profile.error)}</p>
-  return <ProfileForm key={user.id} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} />
+  return <><UsernameEditor username={profile.data?.username||user.username||''}/><ProfileForm key={user.id} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
+}
+
+function UsernameEditor({username}:{username:string}){
+  const cache=useQueryClient()
+  const [draft,setDraft]=useState(username)
+  const [saved,setSaved]=useState(username)
+  const save=useMutation({mutationFn:async()=> (await api.put<{username:string}>('/profile/username',{username:draft})).data.username,onSuccess:next=>{setDraft(next);setSaved(next);cache.setQueryData<User>(['session'],old=>old?{...old,username:next}:old);cache.setQueryData<Profile>(['profile'],old=>old?{...old,username:next}:old)}})
+  return <form className="z-username-editor" onSubmit={event=>{event.preventDefault();if(!save.isPending&&draft.trim()!==saved)save.mutate()}}><label>Мой @юзер<input value={draft} maxLength={41} autoComplete="off" onChange={event=>setDraft(event.target.value)} placeholder="Например, stas_07"/></label><button type="submit" className="secondary" disabled={save.isPending||draft.trim()===saved}>Сохранить @юзер</button><p className="z-field-help">Уникальное имя для поиска. Латинские буквы, цифры и _.</p>{save.isError&&<p className="notice" role="alert">{errorText(save.error)}</p>}{save.isSuccess&&<p role="status">@юзер сохранён.</p>}</form>
 }
 
 function DiscoveryPhoto({ user }: { user: User }) {
