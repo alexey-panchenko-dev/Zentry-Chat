@@ -21,6 +21,7 @@ type PublicUser struct {
 }
 
 type Conversation struct {
+	LastMessage string     `json:"last_message"`
 	ID          string     `json:"id"`
 	Participant PublicUser `json:"participant"`
 	DisplayName string     `json:"display_name,omitempty"`
@@ -48,7 +49,7 @@ func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 func (s *Store) SearchUsers(ctx context.Context, userID, query string) ([]PublicUser, error) {
 	rows, err := s.db.Query(ctx, `SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users
-		WHERE id<>$1 AND (strpos(lower(name),lower($2))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
+		WHERE id<>$1 AND (strpos(lower(name),lower(trim(leading '@' from $2)))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
         ORDER BY lower(name),id LIMIT 20`, userID, query)
 	if err != nil {
 		return nil, err
@@ -104,7 +105,7 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),COALESCE((SELECT CASE WHEN msg.sender_id=$1 THEN 'Вы: ' ELSE '' END || CASE msg.kind WHEN 'image' THEN 'Фото' WHEN 'voice' THEN 'Голосовое сообщение' ELSE left(msg.body,160) END FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>m.cleared_through ORDER BY msg.id DESC LIMIT 1),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
 		LEFT JOIN contact_aliases a ON a.owner_id=$1 AND a.peer_id=u.id
@@ -117,7 +118,7 @@ func (s *Store) Conversations(ctx context.Context, userID string, before int64, 
 	result := make([]Conversation, 0)
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.UnreadCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.LastMessage, &c.UnreadCount); err != nil {
 			return nil, err
 		}
 		result = append(result, c)

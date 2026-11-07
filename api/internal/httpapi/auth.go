@@ -32,17 +32,17 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.Name = strings.TrimSpace(input.Name)
+	username := strings.ToLower(strings.TrimPrefix(input.Name, "@"))
 
 	email, ok := normalizedEmail(input.Email)
 
 	if !ok ||
 		!utf8.ValidString(input.Name) ||
-		utf8.RuneCountInString(input.Name) < 1 ||
-		utf8.RuneCountInString(input.Name) > 100 ||
+		!usernamePattern.MatchString(username) ||
 		!validPassword(input.Password) {
 		writeJSON(w, 400, map[string]string{
 			"error":   "invalid_input",
-			"message": "Нужны имя (1–100 символов), почта и пароль (12–72 байта UTF-8)",
+			"message": "Нужны @юзер (3–40 символов: латиница, цифры и _), почта и пароль (12–72 байта UTF-8)",
 		})
 		return
 	}
@@ -55,11 +55,15 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.service.RegisterWithBirthDate(
 		r.Context(),
-		input.Name,
+		username,
 		email,
-		input.Password, input.BirthDate)
+		input.Password, input.BirthDate, username)
 	if errors.Is(err, auth.ErrEmailExists) {
 		writeJSON(w, 409, map[string]string{"error": "email_already_registered"})
+		return
+	}
+	if errors.Is(err, auth.ErrUsernameExists) {
+		writeJSON(w, 409, map[string]string{"error": "username_taken"})
 		return
 	}
 	if err != nil {

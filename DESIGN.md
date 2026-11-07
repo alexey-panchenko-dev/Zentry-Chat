@@ -63,3 +63,7 @@ Direct chat headers reserve space at the trailing edge for the separately positi
 Photo messages retain their source aspect ratio on desktop and mobile, with a narrow pink frame. The frame and image have matching directional corners; text bubbles also use a sharper corner toward their sender. Direct chat headers show the peer's online state from a short presence heartbeat; unavailable status is distinguished from offline. The refresh and call controls stay aligned and the old Wi-Fi diagnostics control is removed.
 
 Contact profiles show sent and received counts from the viewer's visible history, plus the peer's real name and unique @username. A private contact alias changes only the viewer's chat list and heading. Existing accounts receive unique generated @usernames during migration; owners can change them, and search matches them without case sensitivity.
+
+The registration nickname is the unique @username, rather than a separately generated identity. Existing technical handles are replaced with an already unique, valid profile name where possible. Others choose their @username in the own profile. A private contact name is shown above the contact's public @username and is never shared with the peer.
+
+The private contact-name field appears before the birthday in the contact profile. Full-size chat photos sit centered on a dim, blurred backdrop without a surrounding card; the close control remains at the upper right.

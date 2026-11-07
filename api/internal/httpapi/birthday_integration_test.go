@@ -137,11 +137,11 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 		t.Fatal(err)
 	}
 	contact, err := store.ContactProfile(ctx, c.ID, peer.ID)
-	if err != nil || contact.Birthday != "02-29" {
+	if err != nil || contact.Birthday != "2000-02-29" {
 		t.Fatalf("contact %+v: %v", contact, err)
 	}
 	data, _ = json.Marshal(contact)
-	if strings.Contains(string(data), "2000") {
+	if !strings.Contains(string(data), `"birthday":"2000-02-29"`) {
 		t.Fatal(string(data))
 	}
 	legacy, err := store.OwnProfile(ctx, peer.ID)
@@ -149,3 +149,4 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 		t.Fatalf("legacy %+v %v", legacy, err)
 	}
 }
+

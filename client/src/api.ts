@@ -8,7 +8,11 @@ export const api = axios.create({
 })
 
 export type User = { id: string; name: string; username?: string; avatar_url?: string }
-export type Conversation = { id: string; participant: User; display_name?:string; unread_count?: number }
+export function visibleUsername(user: User): string {
+  const handle = user.username && !/^u_[0-9a-f]{32}$/.test(user.username) ? user.username : user.name
+  return '@' + handle.charAt(0).toUpperCase() + handle.slice(1)
+}
+export type Conversation = { id: string; participant: User; display_name?:string; last_message?:string; unread_count?: number }
 export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string }
 export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string; peer_last_delivered_id?:string }
 export type Message = {
@@ -48,3 +52,4 @@ export function errorText(error: unknown): string {
   }
   return error instanceof Error ? error.message : 'Неизвестная ошибка'
 }
+

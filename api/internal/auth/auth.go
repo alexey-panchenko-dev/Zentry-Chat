@@ -16,6 +16,7 @@ import (
 
 var ErrCredentials = errors.New("invalid credentials")
 var ErrEmailExists = errors.New("email already registered")
+var ErrUsernameExists = errors.New("username already registered")
 var ErrSession = errors.New("invalid session")
 
 const SessionTTL = 7 * 24 * time.Hour
@@ -46,7 +47,7 @@ func New(db *pgxpool.Pool) *Service {
 func (s *Service) Register(ctx context.Context, name, email, password string) (User, error) {
 	return s.RegisterWithBirthDate(ctx, name, email, password, nil)
 }
-func (s *Service) RegisterWithBirthDate(ctx context.Context, name, email, password string, birthDate *string) (User, error) {
+func (s *Service) RegisterWithBirthDate(ctx context.Context, name, email, password string, birthDate *string, handle ...string) (User, error) {
 	var date any
 	if birthDate != nil {
 		d, err := ParseBirthDate(*birthDate, time.Now())
@@ -65,10 +66,18 @@ func (s *Service) RegisterWithBirthDate(ctx context.Context, name, email, passwo
 		return User{}, err
 	}
 	var u User
-	err = tx.QueryRow(ctx, `INSERT INTO users (name,email,password_hash) VALUES ($1,$2,$3)
-		RETURNING id::text,name,username,email,created_at`, name, email, string(hash)).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
+	if len(handle) > 0 {
+		err = tx.QueryRow(ctx, `INSERT INTO users (name,username,email,password_hash) VALUES ($1,$1,$2,$3)
+			RETURNING id::text,name,username,email,created_at`, handle[0], email, string(hash)).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
+	} else {
+		err = tx.QueryRow(ctx, `INSERT INTO users (name,email,password_hash) VALUES ($1,$2,$3)
+			RETURNING id::text,name,username,email,created_at`, name, email, string(hash)).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if pgErr.ConstraintName == "users_username_unique" {
+			return User{}, ErrUsernameExists
+		}
 		return User{}, ErrEmailExists
 	}
 	if err != nil {

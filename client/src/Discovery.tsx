@@ -16,15 +16,15 @@ export function ProfileEditor({ user }: { user: User }) {
   const profile = useProfile()
   if (profile.isPending) return <p role="status">Загружаем профиль…</p>
   if (profile.isError) return <p className="notice">{errorText(profile.error)}</p>
-  return <>{(profile.data?.username||user.username)&&<UsernameEditor username={profile.data?.username||user.username||''}/>}<ProfileForm key={user.id} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
+  return <>{(profile.data?.username||user.username)&&<UsernameEditor username={profile.data?.username||user.username||''}/>}<ProfileForm key={user.id+':'+(profile.data?.username||user.username)} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
 }
 
 function UsernameEditor({username}:{username:string}){
   const cache=useQueryClient()
-  const [draft,setDraft]=useState(username)
+  const [draft,setDraft]=useState(/^u_[0-9a-f]{32}$/.test(username)?'':username)
   const [saved,setSaved]=useState(username)
-  const save=useMutation({mutationFn:async()=> (await api.put<{username:string}>('/profile/username',{username:draft})).data.username,onSuccess:next=>{setDraft(next);setSaved(next);cache.setQueryData<User>(['session'],old=>old?{...old,username:next}:old);cache.setQueryData<Profile>(['profile'],old=>old?{...old,username:next}:old)}})
-  return <form className="z-username-editor" onSubmit={event=>{event.preventDefault();if(!save.isPending&&draft.trim()!==saved)save.mutate()}}><label>Мой @юзер<input value={draft} maxLength={41} autoComplete="off" onChange={event=>setDraft(event.target.value)} placeholder="Например, stas_07"/></label><button type="submit" className="secondary" disabled={save.isPending||draft.trim()===saved}>Сохранить @юзер</button><p className="z-field-help">Уникальное имя для поиска. Латинские буквы, цифры и _.</p>{save.isError&&<p className="notice" role="alert">{errorText(save.error)}</p>}{save.isSuccess&&<p role="status">@юзер сохранён.</p>}</form>
+  const save=useMutation({mutationFn:async()=> (await api.put<{username:string}>('/profile/username',{username:draft})).data.username,onSuccess:next=>{setDraft(next);setSaved(next);cache.setQueryData<User>(['session'],old=>old?{...old,username:next,name:next}:old);cache.setQueryData<Profile>(['profile'],old=>old?{...old,username:next,name:next}:old);void cache.invalidateQueries({queryKey:['conversations']})}})
+  return <form className="z-username-editor" onSubmit={event=>{event.preventDefault();if(!save.isPending&&draft.trim()!==saved)save.mutate()}}><label>Мой ник / @юзер<input value={draft} maxLength={41} autoComplete="username" onChange={event=>setDraft(event.target.value)} placeholder="Например, byliver"/></label><button type="submit" className="secondary" disabled={save.isPending||draft.trim()===saved}>Сохранить ник</button><p className="z-field-help">Это одно имя, по которому вас найдут. Латинские буквы, цифры и _.</p>{save.isError&&<p className="notice" role="alert">{errorText(save.error)}</p>}{save.isSuccess&&<p role="status">Ник сохранён.</p>}</form>
 }
 
 function DiscoveryPhoto({ user }: { user: User }) {
@@ -40,7 +40,6 @@ function ProfileForm({ profile }: {profile: Profile}) {
   const cache = useQueryClient()
   const health=useQuery({queryKey:['registration-capabilities'],queryFn:async()=>(await api.get<unknown>('/health')).data,retry:false,staleTime:60_000,refetchInterval:query=>birthDatesSupported(query.state.data)?false:30_000})
   const birthDatesReady=birthDatesSupported(health.data)
-  const [name, setName] = useState(profile.name)
   const [birthDate,setBirthDate]=useState(formatBirthDate(profile.birth_date))
   const [bio, setBio] = useState(profile.bio)
   const [validation,setValidation]=useState<{field:string;message:string}|null>(null)
@@ -49,7 +48,7 @@ function ProfileForm({ profile }: {profile: Profile}) {
   const age=birthISO?ageFromBirthDate(birthISO):profile.age
   const birthday=birthISO?birthdayLabel(birthISO.slice(5)):null
   const save = useMutation({
-    mutationFn: async () => (await api.put<{profile: Profile}>('/profile', {name,birth_date:parseBirthDate(birthDate),bio,city:profile.city})).data.profile,
+    mutationFn: async () => (await api.put<{profile: Profile}>('/profile', {name:profile.name,birth_date:parseBirthDate(birthDate),bio,city:profile.city})).data.profile,
     onSuccess: next => {
       cache.setQueryData(['profile'], next)
       cache.setQueryData(['session'], (old: User) => ({...old, name: next.name}))
@@ -60,15 +59,13 @@ function ProfileForm({ profile }: {profile: Profile}) {
   function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(save.isPending||!birthDatesReady)return
     let invalid:null|{field:string;message:string}=null
-    if(!name.trim()||Array.from(name).length>100)invalid={field:'name',message:'Введите имя от 1 до 100 символов.'}
     if(!invalid){try{parseBirthDate(birthDate)}catch(e){invalid={field:'birth_date',message:errorText(e)}}}
     if(!invalid&&Array.from(bio).length>100)invalid={field:'bio',message:'Описание должно быть не длиннее 100 символов.'}
     setValidation(invalid);if(invalid){form.current?.querySelector<HTMLElement>('[name="'+invalid.field+'"]')?.focus();return}save.mutate()
   }
   return <form ref={form} noValidate className="z-profile-form" onSubmit={submit}>
-    <label>Имя<input name="name" required maxLength={100} value={name} aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'profile-validation':undefined} onChange={e=>setName(e.target.value)} /></label>
     <div className="z-birth-date-field"><label>Дата рождения<input name="birth_date" required inputMode="numeric" autoComplete="bday" placeholder="ДД.ММ.ГГГГ" maxLength={10} value={birthDate} aria-invalid={validation?.field==='birth_date'} aria-describedby={validation?.field==='birth_date'?'profile-validation':'birth-date-help'} onChange={event=>setBirthDate(maskBirthDate(event.target.value))}/></label><button className="secondary" type="submit" disabled={save.isPending||!birthDatesReady||birthDate===formatBirthDate(profile.birth_date)}>Подтвердить дату</button></div>
-    <p id="birth-date-help" className="z-field-help">Год рождения виден только вам. Возраст рассчитывается автоматически; собеседникам показываются день и месяц.</p>
+    <p id="birth-date-help" className="z-field-help">Дата рождения, включая год, видна собеседникам. Возраст рассчитывается автоматически.</p>
     {age!=null&&<p className="z-muted">Возраст: {age}{birthday&&<> · День рождения: {birthday.label}{birthday.today?' · Сегодня 🎉':''}</>}</p>}
     <label>О себе<textarea name="bio" className="resize-none" value={bio} onChange={e=>setBio(e.target.value)} rows={3} aria-invalid={validation?.field==='bio'} aria-describedby={validation?.field==='bio'?'profile-validation':'bio-help'} /><small id="bio-help">{Array.from(bio).length}/100 символов</small></label>
     {validation&&<p id="profile-validation" className="notice" role="alert">{validation.message}</p>}
@@ -124,3 +121,4 @@ export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => 
     </div>
   </section>
 }
+

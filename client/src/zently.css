@@ -215,3 +215,9 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-bubble-row:not(.is-own):not(.is-system) .z-bubble:has(.z-image-message){border-radius:18px 18px 18px 5px}
 .z-bubble-row.is-own .z-message-image-button{border-radius:14px 14px 3px 14px}
 .z-bubble-row:not(.is-own) .z-message-image-button{border-radius:14px 14px 14px 3px}
+
+/* Full-screen photo viewing without a card around the image. */
+.z-chat-image-dialog[open]{display:flex;align-items:center;justify-content:center;inset:0;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:24px;background:transparent;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+.z-chat-image-dialog::backdrop{background:#08060bdc;backdrop-filter:blur(8px)}
+.z-chat-image-dialog>img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100dvh - 48px);object-fit:contain;margin:auto;border:0;border-radius:0;box-shadow:none}
+.z-chat-image-dialog .z-close-image{position:fixed;right:max(16px,env(safe-area-inset-right));top:max(16px,env(safe-area-inset-top));z-index:1;color:#f5f3f7;background:#16121988;backdrop-filter:blur(8px)}

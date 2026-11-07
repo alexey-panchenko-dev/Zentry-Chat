@@ -68,9 +68,17 @@ func TestHTTPAuthLifecycle(t *testing.T) {
 	request("GET", "/api/health", "", 200)
 	request("GET", "/api/ready", "", 200)
 	request("GET", "/api/auth/me", "", 401)
-	registration := fmt.Sprintf(`{"name":"HTTP Test","email":%q,"password":"test-password-12345"}`, email)
-	request("POST", "/api/auth/register", registration, 201)
+	handle := fmt.Sprintf("http_test_%d", time.Now().UnixNano())
+	registration := fmt.Sprintf(`{"name":%q,"email":%q,"password":"test-password-12345"}`, handle, email)
+	registered := request("POST", "/api/auth/register", registration, 201)
+	var signup struct {
+		User struct{ Name, Username string } `json:"user"`
+	}
+	if err := json.NewDecoder(registered.Body).Decode(&signup); err != nil || signup.User.Name != handle || signup.User.Username != handle {
+		t.Fatalf("registration nickname is not the @username: %+v, %v", signup, err)
+	}
 	request("POST", "/api/auth/register", registration, 409)
+	request("POST", "/api/auth/register", fmt.Sprintf(`{"name":%q,"email":%q,"password":"test-password-12345"}`, handle, "other-"+email), 409)
 	request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"wrong-password-123"}`, email), 401)
 	response := request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"test-password-12345"}`, email), 200)
 	cookies := response.Cookies()

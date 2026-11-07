@@ -28,7 +28,7 @@ import { Discovery, ProfileEditor } from '@/Discovery'
 import { useReadReceipt } from './read-receipt.ts'
 import { LogOut, MessageCircle, RefreshCw, Search, Send, Settings, Phone, ArrowLeft, Plus, Users, Check, CheckCheck, Heart, ChevronsLeft } from 'lucide-react'
 import { Brand, Avatar } from '@/Visual'
-import { api, errorText } from '@/api'
+import { api, errorText, visibleUsername } from '@/api'
 import type { Conversation, Message, MessagePage, ReadState, User } from '@/api'
 
 export default function App() {
@@ -88,7 +88,7 @@ function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
     const fields=Array.from(form.querySelectorAll('input'))
     for(const field of fields){
       let message=''
-      if(field.name==='name'&&(!field.value.trim()||field.value.length>100))message='Введите имя профиля от 1 до 100 символов.'
+      if(field.name==='name'&&!/^@?[a-z][a-z0-9_]{2,39}$/i.test(field.value.trim()))message='Придумайте @юзер: 3–40 символов, латинские буквы, цифры и _.'
       else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например you@example.com.'
       else if(field.name==='password'&&(!field.checkValidity()||field.value.length<12||new TextEncoder().encode(field.value).length>72))message='Введите пароль от 12 символов, не более 72 байт.'
       if(field.name==='birth_date'){try{parseBirthDate(field.value)}catch(e){message=errorText(e)}}
@@ -100,7 +100,7 @@ function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
     <Brand/><p className="z-eyebrow">БЛИЖЕ ДРУГ К ДРУГУ</p><h1>{register ? <>Твой круг.<br/>Твои разговоры.</> : <>С возвращением<br/>в Zently.</>}</h1>
     <p className="z-muted">{register ? 'Создай профиль и будь на связи.' : 'Войди, чтобы продолжить разговор.'}</p>
     <form noValidate className="z-auth-form" onSubmit={submitAuth}>
-      {register && <label>Имя профиля<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Как к тебе обращаться" /></label>}
+      {register && <label>Ник / @юзер<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={41} value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" placeholder="Например, byliver" /></label>}
       {register&&<label>Дата рождения<input name="birth_date" required inputMode="numeric" autoComplete="bday" placeholder="ДД.ММ.ГГГГ" maxLength={10} value={birthDate} aria-invalid={validation?.field==='birth_date'} aria-describedby={validation?.field==='birth_date'?'auth-validation':undefined} onChange={event=>setBirthDate(maskBirthDate(event.target.value))}/></label>}
       <label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
       <label>Пароль<input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type="password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register ? 'new-password' : 'current-password'} placeholder="Не менее 12 символов" /></label>
@@ -194,11 +194,11 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
     <aside className="z-dialogs"><div className="z-list-top"><span>Чаты</span><div><button className="z-icon" aria-label="Обновить переписки" onClick={()=>void dialogs.refetch()}><RefreshCw size={16}/></button>{groupsSupported&&<button className="z-icon" aria-label="Создать группу" title="Создать группу" onClick={()=>setGroupCreateOpen(true)}><Users size={20}/></button>}<button className="z-icon" aria-label="Найти человека" onClick={()=>setSearchOpen(!searchOpen)}><Plus/></button></div></div>
       <form noValidate className="z-search" onSubmit={(e)=>{e.preventDefault();const input=e.currentTarget.querySelector('input')!;const text=search.trim();if(!input.checkValidity()||text.length<2||text.length>100){setSearchError('Введите @юзер, имя или почту от 2 до 100 символов.');input.focus();return}setSearchError('');setQuery(text);setSearchOpen(true)}}><Search size={18}/><input aria-invalid={!!searchError} aria-describedby={searchError?'search-validation':undefined} aria-label="Поиск пользователя" placeholder="@юзер, имя или почта" value={search} onChange={e=>{setSearch(e.target.value);setSearchError('')}} minLength={2} maxLength={100} required/>{search && <button type="button" className="z-clear" aria-label="Очистить поиск" onClick={()=>{setSearch('');setQuery('');setSearchError('')}}>×</button>}<button className="z-icon" aria-label="Найти"><ArrowLeft size={16} className="z-arrow-forward"/></button></form>
       {searchError&&<p id="search-validation" className="notice" role="alert">{searchError}</p>}
-      {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи @юзер, имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}<small>@{peer.username}</small></span><MessageCircle size={17}/></button>)}</div>}
+      {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи @юзер, имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}<small>{visibleUsername(peer)}</small></span><MessageCircle size={17}/></button>)}</div>}
       {removalNotice&&<p className="z-field-help" role="status">{removalNotice}</p>}
       {create.isError&&<p className="notice">{errorText(create.error)}</p>}
       <div className="z-conversation-list">{groups.data&&groups.data.length>0&&<><p className="z-list-label">Группы</p>{groups.data.map(group=><button key={group.id} className={'z-conversation'+(selectedGroup?.id===group.id?' is-selected':'')} onClick={()=>{setSelectedGroup(group);setSelected(null);setUiSection('chats');setMobileChat(true)}}><span className="z-group-avatar"><Users size={20}/></span><span><strong>{group.name}</strong><small>{group.member_count} участника</small></span></button>)}<p className="z-list-label">Личные чаты</p></>}{groups.isError&&<p className="notice">{errorText(groups.error)}</p>}{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
-         {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelectedGroup(null);setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.display_name||dialog.participant.name}</strong><small>{dialog.display_name?dialog.participant.name:'Открыть переписку'}</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
+         {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelectedGroup(null);setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.display_name||dialog.participant.name}</strong><small>{dialog.last_message||'Пока нет сообщений'}</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
         {dialogs.data?.pages[0].conversations.length===0&&<div className="z-empty-copy"><MessageCircle/><p>Твой круг начинается здесь.</p><small>Найди человека по имени или почте.</small></div>}
         {dialogs.hasNextPage&&<button className="secondary" disabled={dialogs.isFetchingNextPage} onClick={()=>void dialogs.fetchNextPage()}>Ещё переписки</button>}
       </div>
@@ -287,3 +287,4 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
     </form>
   </section>
 }
+
