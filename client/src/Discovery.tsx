@@ -16,7 +16,7 @@ export function ProfileEditor({ user }: { user: User }) {
   const profile = useProfile()
   if (profile.isPending) return <p role="status">Загружаем профиль…</p>
   if (profile.isError) return <p className="notice">{errorText(profile.error)}</p>
-  return <><UsernameEditor username={profile.data?.username||user.username||''}/><ProfileForm key={user.id} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
+  return <>{(profile.data?.username||user.username)&&<UsernameEditor username={profile.data?.username||user.username||''}/>}<ProfileForm key={user.id} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
 }
 
 function UsernameEditor({username}:{username:string}){
