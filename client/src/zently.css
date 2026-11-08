@@ -208,7 +208,7 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-image-caption-input{width:min(220px,45vw);min-height:54px;max-height:100px;resize:vertical;padding:10px 12px;font-size:13px;line-height:1.4}
 .z-message-image-button,.z-message-image-button:hover{outline:none}
 .z-message-image-button:focus-visible{outline:1px solid var(--z-pink);outline-offset:1px}
-@media(hover:hover) and (pointer:fine){.z-message-image-button:hover{outline:1px solid var(--z-pink);outline-offset:1px}}
+@media(hover:hover) and (pointer:fine){.z-message-image-button:hover{outline:1px solid var(--z-lime);outline-offset:1px;box-shadow:0 0 12px #b7ff3940}}
 @media(max-width:480px){.z-image-caption-input{width:min(180px,38vw);font-size:13px}}
 @media(max-width:720px){.z-composer-field textarea{font-size:16px}}
 
