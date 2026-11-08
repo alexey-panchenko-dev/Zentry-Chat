@@ -205,7 +205,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
-      {selectedGroup&&<div className="z-message-view" hidden={uiSection!=='chats'}><GroupView key={selectedGroup.id} group={selectedGroup} user={user} onBack={()=>setMobileChat(false)}/></div>}
+      {selectedGroup&&<div className="z-message-view" hidden={uiSection!=='chats'}><GroupView key={selectedGroup.id} group={selectedGroup} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} onBack={()=>setMobileChat(false)}/></div>}
       {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive} realtimeReady={realtimeReady} controls={controls} onRemoved={conversationRemoved} onProfileCall={()=>setRequestCall({id:crypto.randomUUID(),conversationID:selected.id})}/></div>}
       {uiSection==='profile'?<section className="z-settings z-own-profile"><h1>Мой профиль</h1><div className="z-profile"><ProfilePhoto user={user}/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p></div><ProfileEditor user={user}/></section>:uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><MediaAvailability feature="contact_profiles"><ContactSettings/></MediaAvailability><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
       :uiSection==='discovery'?<Discovery fallbackInterval={realtimeReady?false:60_000} onSettings={()=>setUiSection('profile')}/>
@@ -220,6 +220,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
 function Messages({ conversation, user, visible, callActive, realtimeReady, onProfileCall, controls, onRemoved }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean;realtimeReady:boolean;onProfileCall:()=>void;controls:ConversationControlView;onRemoved:(id:string,action:RemovalAction)=>void }) {
   const cache = useQueryClient()
   const [body, setBody] = useState('')
+  const messageInput = useRef<HTMLTextAreaElement>(null)
   const [imageActive,setImageActive]=useState(false)
   const [voiceActive,setVoiceActive]=useState(false)
   const [imageViewing,setImageViewing]=useState(false)
@@ -227,6 +228,12 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
   const [live, setLive] = useState<Record<string, Message>>({})
   const pending = useRef<{ body: string; id: string } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
+  const contactDisabled=controls.blocked||controls.unavailable
+  useEffect(() => {
+    if(!visible||contactDisabled||callActive||profileOpen||imageViewing||imageActive||voiceActive)return
+    const frame=window.requestAnimationFrame(()=>messageInput.current?.focus({preventScroll:true}))
+    return()=>window.cancelAnimationFrame(frame)
+  },[conversation.id,visible,contactDisabled,callActive,profileOpen,imageViewing,imageActive,voiceActive])
   const history = useInfiniteQuery({
     enabled: visible,
     queryKey: ['messages', conversation.id], initialPageParam: '',
@@ -262,6 +269,11 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
       setBody(''); pending.current = null
        void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})
     },
+    onSettled: () => {
+      window.requestAnimationFrame(()=>{
+        if(visible&&!contactDisabled)messageInput.current?.focus({preventScroll:true})
+      })
+    },
   })
   const merged = new Map<string, Message>()
   history.data?.pages.forEach((page) => page.messages.forEach((message) => merged.set(message.id, message)))
@@ -270,7 +282,6 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
   const latest = messages.at(-1)?.id
   useReadReceipt(conversation.id, latest, visible && !callActive && !profileOpen && !imageViewing, bottom)
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [latest])
-  const contactDisabled=controls.blocked||controls.unavailable
   function submit(event: FormEvent) { event.preventDefault(); if (body.trim() && !send.isPending && !contactDisabled) send.mutate(body.trim()) }
 
   return <section className="z-messages">
@@ -283,7 +294,7 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
       {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='image'?<ImageMessage url={message.image_url} onOpenChange={setImageViewing}/>:message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&(messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='read'?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='delivered'?<CheckCheck size={16} aria-label="Доставлено" className="z-dark-check"/>:<Check size={16} aria-label="Отправлено" className="z-dark-check"/>)}</div></div></div>)}<div ref={bottom} style={{minHeight:1}}/>
     </div>
     <form noValidate className="z-composer-region" onSubmit={submit}>{controls.state&&blockNotice(controls.state)&&<p className="notice" role="status">{blockNotice(controls.state)}</p>}{controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<p className="notice" role="alert">Не удалось проверить переписку. <button type="button" className="secondary" onClick={()=>void controls.refetch()}>Повторить</button></p>}{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
-      <div className="z-composer"><div className="z-composer-field"><textarea className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending||contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
+      <div className="z-composer"><div className="z-composer-field"><textarea ref={messageInput} className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending||contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
     </form>
   </section>
 }

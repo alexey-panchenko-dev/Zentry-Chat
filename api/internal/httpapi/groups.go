@@ -26,7 +26,7 @@ func (h *chatHandlers) createGroup(w http.ResponseWriter, r *http.Request, u aut
 		return
 	}
 	in.Name = strings.TrimSpace(in.Name)
-	if !utf8.ValidString(in.Name) || strings.ContainsRune(in.Name, 0) || utf8.RuneCountInString(in.Name) < 1 || utf8.RuneCountInString(in.Name) > 80 || len(in.MemberIDs) < 3 || len(in.MemberIDs) > 49 {
+	if !utf8.ValidString(in.Name) || strings.ContainsRune(in.Name, 0) || utf8.RuneCountInString(in.Name) < 1 || utf8.RuneCountInString(in.Name) > 80 || len(in.MemberIDs) < 2 || len(in.MemberIDs) > 49 {
 		writeJSON(w, 400, map[string]string{"error": "invalid_group"})
 		return
 	}

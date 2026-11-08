@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-var ErrGroupMembers = errors.New("select at least three contacts")
+var ErrGroupMembers = errors.New("select at least two contacts")
 
 type Group struct {
 	ID          string    `json:"id"`
@@ -44,7 +44,7 @@ func (s *Store) GroupContacts(ctx context.Context, user string) ([]PublicUser, e
 	return out, rows.Err()
 }
 func (s *Store) CreateGroup(ctx context.Context, owner, name string, peers []string) (Group, []string, error) {
-	if len(peers) < 3 || len(peers) > 49 {
+	if len(peers) < 2 || len(peers) > 49 {
 		return Group{}, nil, ErrGroupMembers
 	}
 	tx, err := s.db.Begin(ctx)
