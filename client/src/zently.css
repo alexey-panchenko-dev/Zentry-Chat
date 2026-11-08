@@ -232,3 +232,14 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-chat-image-dialog::backdrop{background:#08060bdc;backdrop-filter:blur(8px)}
 .z-chat-image-dialog>img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100dvh - 48px);object-fit:contain;margin:auto;border:0;border-radius:0;box-shadow:none}
 .z-chat-image-dialog .z-close-image{position:fixed;right:max(16px,env(safe-area-inset-right));top:max(16px,env(safe-area-inset-top));z-index:1;color:#f5f3f7;background:#16121988;backdrop-filter:blur(8px)}
+
+/* Frosted glass accents: keep the photo itself clear and soften only its close control. */
+.z-chat-image-dialog .z-close-image{background:linear-gradient(145deg,#ffffff2c,#ffffff0c 52%,#ff14931c);border:1px solid #ffffff45;box-shadow:inset 0 1px 0 #ffffff52,inset 0 -1px 0 #ff149326,0 8px 26px #0008;backdrop-filter:blur(18px) saturate(155%);-webkit-backdrop-filter:blur(18px) saturate(155%);transition:background .18s ease,border-color .18s ease,box-shadow .18s ease}
+.z-chat-image-dialog .z-close-image:hover{background:linear-gradient(145deg,#ffffff3d,#ffffff15 52%,#b7ff3926);border-color:#b7ff3980;box-shadow:inset 0 1px 0 #ffffff66,0 0 16px #b7ff3938,0 8px 26px #0008}
+.z-chat-image-dialog .z-close-image:focus-visible{outline:2px solid #b7ff39;outline-offset:3px}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-chat-image-dialog .z-close-image{background:#211a25f2}}
+
+/* Let the chat atmosphere softly pass through text bubbles, while keeping their colors distinct. */
+.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(145deg,#eb007ecc,#b1005dd9);backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%);box-shadow:inset 0 1px 0 #ffc7e26e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff14932b,transparent 64%),linear-gradient(135deg,#332630d9,#272129d1 58%,#211d24d4);backdrop-filter:blur(14px) saturate(125%);-webkit-backdrop-filter:blur(14px) saturate(125%);box-shadow:inset 0 1px 0 #ffffff1c,-4px 0 13px #ff14934f,0 8px 24px #00000038}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(150deg,#eb007e,#b1005d)}.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff149326,transparent 64%),linear-gradient(135deg,#332630,#272129 58%,#211d24)}}
