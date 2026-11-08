@@ -203,6 +203,8 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-message-image-button img{width:100%;height:auto;max-width:100%;max-height:none;aspect-ratio:auto;object-fit:contain}
 @media(max-width:480px){.z-image-message{width:min(220px,calc(290px * var(--photo-ratio,1)))}.z-message-image-button{width:100%}}
 .z-bubble.is-image-bubble{padding:2px 2px 6px;min-width:0}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble.is-image-bubble{padding:2px 2px 6px;min-width:0}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble.is-image-bubble:before{display:none}
 .z-bubble:has(.z-image-message) .z-message-meta{margin:4px 7px 0}
 .z-image-caption{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 8px 2px;font-size:13px;line-height:1.55}
 .z-image-caption-input{width:min(220px,45vw);min-height:54px;max-height:100px;resize:vertical;padding:10px 12px;font-size:13px;line-height:1.4}
