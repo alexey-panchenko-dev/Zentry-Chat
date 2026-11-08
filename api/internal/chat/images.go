@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Store) SendImage(ctx context.Context, c, u, id string, data []byte) (Message, bool, error) {
+func (s *Store) SendImage(ctx context.Context, c, u, id, caption string, data []byte) (Message, bool, error) {
 	if err := s.CheckMember(ctx, c, u); err != nil {
 		return Message{}, false, err
 	}
@@ -21,13 +21,13 @@ func (s *Store) SendImage(ctx context.Context, c, u, id string, data []byte) (Me
 		return Message{}, false, err
 	}
 	var m Message
-	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body,kind,image,image_mime) VALUES($1,$2,$3,'','image',$4,'image/jpeg') ON CONFLICT(sender_id,client_message_id) DO NOTHING RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind`, c, u, id, data).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind)
+	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body,kind,image,image_mime) VALUES($1,$2,$3,$4,'image',$5,'image/jpeg') ON CONFLICT(sender_id,client_message_id) DO NOTHING RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind`, c, u, id, caption, data).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind)
 	created := err == nil
 	if errors.Is(err, pgx.ErrNoRows) {
 		var original []byte
 		var originalMime string
 		err = tx.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,kind,COALESCE(image,''::bytea),COALESCE(image_mime,'') FROM messages WHERE sender_id=$1 AND client_message_id=$2`, u, id).Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &original, &originalMime)
-		if err == nil && (m.Kind != "image" || m.ConversationID != c || originalMime != "image/jpeg" || !bytes.Equal(original, data)) {
+		if err == nil && (m.Kind != "image" || m.ConversationID != c || m.Body != caption || originalMime != "image/jpeg" || !bytes.Equal(original, data)) {
 			return Message{}, false, ErrConflict
 		}
 	}

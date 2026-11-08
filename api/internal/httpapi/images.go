@@ -9,9 +9,19 @@ import (
 	"newsChat/api/internal/auth"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const maxMessageImage = 4 * 1024 * 1024
+const maxImageCaption = 1000
+
+func normalizeImageCaption(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if utf8.RuneCountInString(value) > maxImageCaption {
+		return "", errors.New("caption too long")
+	}
+	return value, nil
+}
 
 func normalizeMessageImage(b []byte) ([]byte, error) {
 	if len(b) == 0 || len(b) > maxMessageImage {
@@ -44,7 +54,8 @@ func (h *chatHandlers) sendImage(w http.ResponseWriter, r *http.Request, u auth.
 		return
 	}
 	clientID := strings.ToLower(r.FormValue("client_message_id"))
-	if !uuidPattern.MatchString(clientID) {
+	caption, captionErr := normalizeImageCaption(r.FormValue("caption"))
+	if !uuidPattern.MatchString(clientID) || captionErr != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid_image"})
 		return
 	}
@@ -53,7 +64,7 @@ func (h *chatHandlers) sendImage(w http.ResponseWriter, r *http.Request, u auth.
 		writeJSON(w, 400, map[string]string{"error": "invalid_image"})
 		return
 	}
-	message, created, err := h.store.SendImage(r.Context(), id, u.ID, clientID, b)
+	message, created, err := h.store.SendImage(r.Context(), id, u.ID, clientID, caption, b)
 	if err != nil {
 		chatFailure(w, err)
 		return

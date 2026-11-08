@@ -114,7 +114,7 @@ func TestChatAccessAndDelivery(t *testing.T) {
 		t.Fatalf("original realtime keys changed: %s", capabilities)
 	}
 	var media map[string]bool
-	if err := json.Unmarshal(capabilities["media"], &media); err != nil || !media["voice"] || !media["profile_photos"] {
+	if err := json.Unmarshal(capabilities["media"], &media); err != nil || !media["voice"] || !media["profile_photos"] || !media["chat_removal"] {
 		t.Fatalf("missing media capabilities: %s (%v)", capabilities, err)
 	}
 	found := request(0, "GET", "/api/users?query="+users[1].Email, "", 200)

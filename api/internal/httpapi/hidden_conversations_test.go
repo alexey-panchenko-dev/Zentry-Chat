@@ -141,7 +141,7 @@ func TestNewMessageKindsReopenHiddenConversations(t *testing.T) {
 		case "image":
 			var encoded bytes.Buffer
 			if err = jpeg.Encode(&encoded, image.NewRGBA(image.Rect(0, 0, 1, 1)), nil); err == nil {
-				_, _, err = f.store.SendImage(f.ctx, f.conv.ID, f.users[1].ID, id, encoded.Bytes())
+				_, _, err = f.store.SendImage(f.ctx, f.conv.ID, f.users[1].ID, id, "", encoded.Bytes())
 			}
 		case "system":
 			tx, e := f.db.Begin(f.ctx)

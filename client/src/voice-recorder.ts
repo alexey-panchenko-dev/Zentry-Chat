@@ -36,7 +36,7 @@ export class VoiceRecorder {
  }
  // stop() flushes its last chunk asynchronously. Keep the source alive until
  // onstop handles that chunk; cancel/dispose still release it immediately.
- stop(){if(this.recorder?.state==='recording')this.recorder.stop()}
+ stop(){if(this.recorder?.state==='recording'){try{this.recorder.requestData()}catch{/* stop still flushes the final available chunk */}this.recorder.stop()}}
  cancel(){++this.generation;this.release();if(this.recorder?.state==='recording')this.recorder.stop();this.recorder=undefined;if(this.state.draft)this.env.revokeURL(this.state.draft.url);this.emit({phase:'idle'})}
  dispose(){this.disposed=true;this.cancel()}
 }

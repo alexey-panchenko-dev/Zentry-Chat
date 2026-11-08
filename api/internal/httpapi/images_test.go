@@ -5,8 +5,22 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"strings"
 	"testing"
 )
+
+func TestNormalizeImageCaption(t *testing.T) {
+	caption, err := normalizeImageCaption("  подпись к фото  ")
+	if err != nil || caption != "подпись к фото" {
+		t.Fatalf("got %q, %v", caption, err)
+	}
+	if caption, err = normalizeImageCaption(" \t "); err != nil || caption != "" {
+		t.Fatalf("empty caption got %q, %v", caption, err)
+	}
+	if _, err = normalizeImageCaption(strings.Repeat("я", maxImageCaption+1)); err == nil {
+		t.Fatal("caption above the character limit was accepted")
+	}
+}
 
 func TestNormalizeMessageImage(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 32, 24))

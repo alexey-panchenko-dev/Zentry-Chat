@@ -60,12 +60,11 @@ export default function App() {
   return <div className={session.data ? 'z-root' : 'z-auth-page'}>
     {session.isPending ? <div className="z-loading" role="status"><Brand/><p>Открываем Zently…</p></div>
       : session.isError ? <div className="z-auth-card"><Brand/><p className="notice">{errorText(session.error)}</p><button className="secondary" onClick={() => void session.refetch()}>Повторить</button></div>
-      : session.data ? <Chat key={session.data.id} user={session.data} onSessionViewChanged={sessionViewChanged} /> : <Auth onSessionViewChanged={sessionViewChanged} />}
+      : session.data ? <Chat key={session.data.id} user={session.data} onSessionViewChanged={sessionViewChanged} /> : <Auth />}
   </div>
 }
 
-function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
-  const cache = useQueryClient()
+function Auth() {
   const [register, setRegister] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -79,7 +78,7 @@ function Auth({onSessionViewChanged}:{onSessionViewChanged:()=>void}) {
       if (register) await api.post('/auth/register', { name, email, password, birth_date:parseBirthDate(birthDate) })
       return (await api.post<{ user: User }>('/auth/login', { email, password })).data.user
     },
-    onSuccess: (user) => { cache.clear(); cache.setQueryData(['session'], user); onSessionViewChanged() },
+    onSuccess: () => { window.location.replace(`${window.location.pathname}#chats`) },
   })
   function submitAuth(event:FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -229,11 +228,6 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
   const pending = useRef<{ body: string; id: string } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const contactDisabled=controls.blocked||controls.unavailable
-  useEffect(() => {
-    if(!visible||contactDisabled||callActive||profileOpen||imageViewing||imageActive||voiceActive)return
-    const frame=window.requestAnimationFrame(()=>messageInput.current?.focus({preventScroll:true}))
-    return()=>window.cancelAnimationFrame(frame)
-  },[conversation.id,visible,contactDisabled,callActive,profileOpen,imageViewing,imageActive,voiceActive])
   const history = useInfiniteQuery({
     enabled: visible,
     queryKey: ['messages', conversation.id], initialPageParam: '',
@@ -269,12 +263,12 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
       setBody(''); pending.current = null
        void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})
     },
-    onSettled: () => {
-      window.requestAnimationFrame(()=>{
-        if(visible&&!contactDisabled)messageInput.current?.focus({preventScroll:true})
-      })
-    },
   })
+  useEffect(() => {
+    if(!visible||contactDisabled||send.isPending||callActive||profileOpen||imageViewing||imageActive||voiceActive)return
+    const frame=window.requestAnimationFrame(()=>messageInput.current?.focus({preventScroll:true}))
+    return()=>window.cancelAnimationFrame(frame)
+  },[conversation.id,visible,contactDisabled,send.isPending,callActive,profileOpen,imageViewing,imageActive,voiceActive])
   const merged = new Map<string, Message>()
   history.data?.pages.forEach((page) => page.messages.forEach((message) => merged.set(message.id, message)))
   Object.values(live).forEach((message) => merged.set(message.id, message))
@@ -291,10 +285,10 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
       {history.hasNextPage&&<button className="secondary z-older" disabled={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}>Более ранние сообщения</button>}
       {history.isPending&&<p className="z-empty-copy" role="status">Загружаем историю…</p>}{history.isError&&<p className="notice">{errorText(history.error)}</p>}
       {!history.isPending&&!history.isError&&messages.length===0&&<div className="z-empty-copy"><p>Начни разговор</p><small>Напиши первое сообщение.</small></div>}
-      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='image'?<ImageMessage url={message.image_url} onOpenChange={setImageViewing}/>:message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&(messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='read'?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='delivered'?<CheckCheck size={16} aria-label="Доставлено" className="z-dark-check"/>:<Check size={16} aria-label="Отправлено" className="z-dark-check"/>)}</div></div></div>)}<div ref={bottom} style={{minHeight:1}}/>
+      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className="z-bubble"><>{message.kind==='image'?<><ImageMessage url={message.image_url} onOpenChange={setImageViewing}/>{message.body.trim()&&<p className="z-image-caption">{message.body}</p>}</>:message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&(messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='read'?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='delivered'?<CheckCheck size={16} aria-label="Доставлено" className="z-dark-check"/>:<Check size={16} aria-label="Отправлено" className="z-dark-check"/>)}</div></div></div>)}<div ref={bottom} style={{minHeight:1}}/>
     </div>
     <form noValidate className="z-composer-region" onSubmit={submit}>{controls.state&&blockNotice(controls.state)&&<p className="notice" role="status">{blockNotice(controls.state)}</p>}{controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<p className="notice" role="alert">Не удалось проверить переписку. <button type="button" className="secondary" onClick={()=>void controls.refetch()}>Повторить</button></p>}{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
-      <div className="z-composer"><div className="z-composer-field"><textarea ref={messageInput} className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} disabled={send.isPending||contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
+      <div className="z-composer"><div className="z-composer-field"><textarea ref={messageInput} className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} readOnly={send.isPending} disabled={contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
     </form>
   </section>
 }

@@ -187,7 +187,7 @@ func (h *chatHandlers) realtimeConfig(w http.ResponseWriter, r *http.Request, us
 	for key, value := range h.publisher.PublicConfig() {
 		config[key] = value
 	}
-	config["media"] = map[string]bool{"voice": true, "profile_photos": true, "contact_profiles": true, "chat_controls": true, "chat_images": true, "groups": true}
+	config["media"] = map[string]bool{"voice": true, "profile_photos": true, "contact_profiles": true, "chat_controls": true, "chat_images": true, "chat_removal": true, "groups": true}
 	writeJSON(w, 200, config)
 }
 

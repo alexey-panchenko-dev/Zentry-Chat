@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { VoiceRecorder } from '../src/voice-recorder.ts'
 function setup(getMedia) {
  const track={stopped:false,stop(){this.stopped=true}}
- class Recorder { static isTypeSupported(){return true}; state='inactive'; mimeType='audio/webm'; start(){this.state='recording'} stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['voice'])});this.onstop?.()} }
+ class Recorder { static isTypeSupported(){return true}; state='inactive'; mimeType='audio/webm'; start(){this.state='recording'} requestData(){this.ondataavailable?.({data:new Blob(['voice'])})} stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['final'])});this.onstop?.()} }
  let timer; let revoked=0; let state
  const env={getMedia:getMedia??(async()=>({getTracks:()=>[track]})),Recorder,createURL:()=> 'blob:test',revokeURL:()=>revoked++,now:()=>1000,setTimer:fn=>{timer=fn;return 1},clearTimer:()=>{},uuid:()=> 'same-id'}
  const recorder=new VoiceRecorder(s=>state=s,env)
@@ -31,4 +31,11 @@ test('stopping waits for the final chunk before offering preview',async()=>{
  const track={stopped:false,stop(){this.stopped=true}}
  const recorder=new VoiceRecorder(next=>state=next,{getMedia:async()=>({getTracks:()=>[track]}),Recorder:AsyncRecorder,createURL:()=> 'blob:test',revokeURL:()=>{},now:()=>1000,setTimer:()=>1,clearTimer:()=>{},uuid:()=> 'id'})
  await recorder.start();recorder.stop();assert.equal(track.stopped,false,'capture must remain available until the recorder flushes its final data');assert.equal(state.draft,undefined);instance.ondataavailable({data:new Blob(['final'])});instance.onstop();assert.ok(track.stopped);assert.equal(state.phase,'preview');assert.equal(await state.draft.blob.text(),'final');recorder.dispose()
+})
+test('stop requests buffered audio before the recorder flushes its final chunk',async()=>{
+ let state
+ class BufferedRecorder{static isTypeSupported(){return true};state='inactive';mimeType='audio/webm';start(){this.state='recording'}requestData(){this.ondataavailable?.({data:new Blob(['buffered'])})}stop(){this.state='inactive';this.ondataavailable?.({data:new Blob(['final'])});this.onstop?.()}}
+ const track={stopped:false,stop(){this.stopped=true}}
+ const recorder=new VoiceRecorder(next=>state=next,{getMedia:async()=>({getTracks:()=>[track]}),Recorder:BufferedRecorder,createURL:()=> 'blob:test',revokeURL:()=>{},now:()=>1000,setTimer:()=>1,clearTimer:()=>{},uuid:()=> 'id'})
+ await recorder.start();recorder.stop();assert.equal(state.phase,'preview');assert.equal(await state.draft.blob.text(),'bufferedfinal');assert.ok(track.stopped);recorder.dispose()
 })
