@@ -14,6 +14,8 @@ type Group struct {
 	Name        string    `json:"name"`
 	OwnerID     string    `json:"owner_id"`
 	MemberCount int       `json:"member_count"`
+	AvatarURL   string    `json:"avatar_url,omitempty"`
+	MessageCount int64    `json:"message_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -25,6 +27,8 @@ type GroupMessage struct {
 	ClientMessageID string    `json:"client_message_id"`
 	Body            string    `json:"body"`
 	CreatedAt       time.Time `json:"created_at"`
+	Kind            string    `json:"kind,omitempty"`
+	ImageURL        string    `json:"image_url,omitempty"`
 }
 
 func (s *Store) GroupContacts(ctx context.Context, user string) ([]PublicUser, error) {
@@ -73,7 +77,7 @@ func (s *Store) CreateGroup(ctx context.Context, owner, name string, peers []str
 	return g, append([]string{owner}, peers...), tx.Commit(ctx)
 }
 func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
-	rows, err := s.db.Query(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE m.user_id=$1 ORDER BY g.updated_at DESC LIMIT 200`, user)
+	rows, err := s.db.Query(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE m.user_id=$1 ORDER BY g.updated_at DESC LIMIT 200`, user)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +85,7 @@ func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
 	out := []Group{}
 	for rows.Next() {
 		var g Group
-		if err = rows.Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount); err != nil {
+		if err = rows.Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -90,7 +94,7 @@ func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
 }
 func (s *Store) Group(ctx context.Context, id, user string) (Group, error) {
 	var g Group
-	err := s.db.QueryRow(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE g.id=$1 AND m.user_id=$2`, id, user).Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount)
+	err := s.db.QueryRow(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE g.id=$1 AND m.user_id=$2`, id, user).Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
@@ -119,7 +123,7 @@ func (s *Store) GroupMessages(ctx context.Context, id, user string, before int64
 	if _, err := s.Group(ctx, id, user); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.group_id::text,m.sender_id::text,u.name,m.client_message_id::text,m.body,m.created_at FROM group_messages m JOIN users u ON u.id=m.sender_id WHERE m.group_id=$1 AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, id, before, limit)
+	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.group_id::text,m.sender_id::text,u.name,m.client_message_id::text,m.body,m.created_at,m.kind FROM group_messages m JOIN users u ON u.id=m.sender_id WHERE m.group_id=$1 AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, id, before, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +131,10 @@ func (s *Store) GroupMessages(ctx context.Context, id, user string, before int64
 	out := []GroupMessage{}
 	for rows.Next() {
 		var m GroupMessage
-		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt); err != nil {
+		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind); err != nil {
 			return nil, err
 		}
+		if m.Kind == "image" { m.ImageURL = "/api/groups/" + id + "/messages/" + m.ID + "/image" }
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -158,10 +163,11 @@ func (s *Store) SendGroupMessage(ctx context.Context, id, user, clientID, body s
 	}
 	var m GroupMessage
 	err = tx.QueryRow(ctx, `INSERT INTO group_messages(group_id,sender_id,client_message_id,body) VALUES($1,$2,$3,$4) ON CONFLICT(sender_id,client_message_id) DO NOTHING RETURNING id::text,group_id::text,sender_id::text,client_message_id::text,body,created_at`, id, user, clientID, body).Scan(&m.ID, &m.GroupID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
+	m.Kind = "text"
 	created := err == nil
 	if errors.Is(err, pgx.ErrNoRows) {
-		err = tx.QueryRow(ctx, `SELECT id::text,group_id::text,sender_id::text,client_message_id::text,body,created_at FROM group_messages WHERE sender_id=$1 AND client_message_id=$2`, user, clientID).Scan(&m.ID, &m.GroupID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
-		if err == nil && (m.GroupID != id || m.Body != body) {
+		err = tx.QueryRow(ctx, `SELECT id::text,group_id::text,sender_id::text,client_message_id::text,body,created_at,kind FROM group_messages WHERE sender_id=$1 AND client_message_id=$2`, user, clientID).Scan(&m.ID, &m.GroupID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind)
+		if err == nil && (m.GroupID != id || m.Body != body || m.Kind != "text") {
 			return GroupMessage{}, false, nil, ErrConflict
 		}
 	}

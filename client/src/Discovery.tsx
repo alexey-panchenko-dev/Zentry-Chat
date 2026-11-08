@@ -1,4 +1,5 @@
-import { formatBirthDate, maskBirthDate, parseBirthDate, ageFromBirthDate, birthdayLabel, birthDatesSupported } from './birthdays'
+import { formatBirthDate, parseBirthDate, ageFromBirthDate, birthdayLabel, birthDatesSupported } from './birthdays'
+import { BirthDateWheel } from './BirthDateWheel'
 import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -61,10 +62,10 @@ function ProfileForm({ profile }: {profile: Profile}) {
     let invalid:null|{field:string;message:string}=null
     if(!invalid){try{parseBirthDate(birthDate)}catch(e){invalid={field:'birth_date',message:errorText(e)}}}
     if(!invalid&&Array.from(bio).length>100)invalid={field:'bio',message:'Описание должно быть не длиннее 100 символов.'}
-    setValidation(invalid);if(invalid){form.current?.querySelector<HTMLElement>('[name="'+invalid.field+'"]')?.focus();return}save.mutate()
+    setValidation(invalid);if(invalid){form.current?.querySelector<HTMLElement>(invalid.field==='birth_date'?'[role="spinbutton"]':'[name="'+invalid.field+'"]')?.focus();return}save.mutate()
   }
   return <form ref={form} noValidate className="z-profile-form" onSubmit={submit}>
-    <div className="z-birth-date-field"><label>Дата рождения<input name="birth_date" required inputMode="numeric" autoComplete="bday" placeholder="ДД.ММ.ГГГГ" maxLength={10} value={birthDate} aria-invalid={validation?.field==='birth_date'} aria-describedby={validation?.field==='birth_date'?'profile-validation':'birth-date-help'} onChange={event=>setBirthDate(maskBirthDate(event.target.value))}/></label><button className="secondary" type="submit" disabled={save.isPending||!birthDatesReady||birthDate===formatBirthDate(profile.birth_date)}>Подтвердить дату</button></div>
+    <div className="z-birth-date-field"><div><label>Дата рождения</label><BirthDateWheel value={birthDate} onChange={setBirthDate} invalid={validation?.field==='birth_date'} describedBy={validation?.field==='birth_date'?'profile-validation':'birth-date-help'}/></div><button className="secondary" type="submit" disabled={save.isPending||!birthDatesReady||birthDate===formatBirthDate(profile.birth_date)}>Подтвердить дату</button></div>
     <p id="birth-date-help" className="z-field-help">Дата рождения, включая год, видна собеседникам. Возраст рассчитывается автоматически.</p>
     {age!=null&&<p className="z-muted">Возраст: {age}{birthday&&<> · День рождения: {birthday.label}{birthday.today?' · Сегодня 🎉':''}</>}</p>}
     <label>О себе<textarea name="bio" className="resize-none" value={bio} onChange={e=>setBio(e.target.value)} rows={3} aria-invalid={validation?.field==='bio'} aria-describedby={validation?.field==='bio'?'profile-validation':'bio-help'} /><small id="bio-help">{Array.from(bio).length}/100 символов</small></label>

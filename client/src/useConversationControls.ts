@@ -14,7 +14,7 @@ export function useConversationControls(conversationID?:string,realtimeReady=tru
  const action=useMutation({mutationFn:async({value,id}:{value:ControlAction;id:string})=>(await api.post<ConversationControls>(`/conversations/${id}/controls`,{action:value})).data,onSuccess:async(state,{value,id})=>{
   await cache.cancelQueries({queryKey:['chat-controls',id]})
   cache.setQueryData(['chat-controls',id],state)
-  if(value==='clear'||value==='delete_chat'){
+  if(value==='clear'||value==='delete_chat'||value==='delete_everyone'){
    await cache.cancelQueries({queryKey:['messages',id]})
    cache.setQueryData<InfiniteData<MessagePage>>(['messages',id],old=>old?{...old,pages:old.pages.map(page=>({...page,messages:page.messages.filter(message=>messageVisible(message.id,state.cleared_through))}))}:old)
   }

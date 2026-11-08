@@ -139,6 +139,28 @@ func (h *chatHandlers) listMessages(w http.ResponseWriter, r *http.Request, user
 	writeJSON(w, 200, map[string]any{"messages": list, "next_cursor": cursor})
 }
 
+func (h *chatHandlers) listConversationImages(w http.ResponseWriter, r *http.Request, user auth.User) {
+	id, ok := conversationID(w, r)
+	if !ok {
+		return
+	}
+	before, limit, ok := pagination(w, r)
+	if !ok {
+		return
+	}
+	list, err := h.store.ConversationImages(r.Context(), id, user.ID, before, limit+1)
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
+	cursor := ""
+	if len(list) > limit {
+		list = list[:limit]
+		cursor = list[len(list)-1].ID
+	}
+	writeJSON(w, 200, map[string]any{"images": list, "next_cursor": cursor})
+}
+
 func (h *chatHandlers) sendMessage(w http.ResponseWriter, r *http.Request, user auth.User) {
 	id, ok := conversationID(w, r)
 	if !ok {
@@ -258,6 +280,10 @@ func pagination(w http.ResponseWriter, r *http.Request) (int64, int, bool) {
 func chatFailure(w http.ResponseWriter, err error) {
 	if errors.Is(err, chat.ErrBlocked) {
 		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
+		return
+	}
+	if errors.Is(err, chat.ErrForbidden) {
+		writeJSON(w, 403, map[string]string{"error": "forbidden"})
 		return
 	}
 	if errors.Is(err, chat.ErrProfileRequired) {

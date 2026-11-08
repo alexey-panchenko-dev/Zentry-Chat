@@ -73,6 +73,35 @@ func TestMessageImagesPermissionsAndControls(t *testing.T) {
 			}
 		}
 	}
+	listImages := func(actor int, c, before string, want int) []chat.Message {
+		t.Helper()
+		path := "/api/conversations/" + c + "/images?limit=12"
+		if before != "" {
+			path += "&before=" + before
+		}
+		req, _ := http.NewRequest("GET", f.server.URL+path, nil)
+		if actor >= 0 {
+			req.AddCookie(&http.Cookie{Name: sessionCookie, Value: f.tokens[actor]})
+		}
+		res, err := f.server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		raw, _ := io.ReadAll(res.Body)
+		if res.StatusCode != want {
+			t.Fatalf("image list actor%d status%d want%d: %s", actor, res.StatusCode, want, raw)
+		}
+		var result struct {
+			Images []chat.Message `json:"images"`
+		}
+		if want == http.StatusOK {
+			if err := json.Unmarshal(raw, &result); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return result.Images
+	}
 	const id = "ec667c9a-1c80-40f3-8287-ef304d5c3451"
 	upload(-1, f.conv.ID, id, jpegData.Bytes(), 401)
 	upload(2, f.conv.ID, id, jpegData.Bytes(), 404)
@@ -80,6 +109,14 @@ func TestMessageImagesPermissionsAndControls(t *testing.T) {
 	if m.Kind != "image" || m.ImageURL == "" {
 		t.Fatalf("image message %+v", m)
 	}
+	if got := listImages(0, f.conv.ID, "", 200); len(got) != 1 || got[0].ImageURL != m.ImageURL {
+		t.Fatalf("photo gallery for sender: %+v", got)
+	}
+	if got := listImages(1, f.conv.ID, "", 200); len(got) != 1 || got[0].ImageURL != m.ImageURL {
+		t.Fatalf("photo gallery for peer: %+v", got)
+	}
+	listImages(-1, f.conv.ID, "", 401)
+	listImages(2, f.conv.ID, "", 404)
 	retry := upload(0, f.conv.ID, id, jpegData.Bytes(), 200)
 	if retry.ID != m.ID {
 		t.Fatal("retry created duplicate")
@@ -110,6 +147,12 @@ func TestMessageImagesPermissionsAndControls(t *testing.T) {
 	upload(0, c.ID, id, jpegData.Bytes(), 409)
 	if _, err = f.store.ChangeControls(f.ctx, f.conv.ID, f.users[0].ID, "clear"); err != nil {
 		t.Fatal(err)
+	}
+	if got := listImages(0, f.conv.ID, "", 200); len(got) != 0 {
+		t.Fatalf("cleared photo remained in gallery: %+v", got)
+	}
+	if got := listImages(1, f.conv.ID, "", 200); len(got) != 1 || got[0].ImageURL != m.ImageURL {
+		t.Fatalf("other participant should retain photo: %+v", got)
 	}
 	get(0, m.ImageURL, 404)
 	get(1, m.ImageURL, 200)

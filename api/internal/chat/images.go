@@ -53,3 +53,25 @@ func (s *Store) Image(ctx context.Context, id, u string) ([]byte, string, error)
 	}
 	return b, mime, err
 }
+
+func (s *Store) ConversationImages(ctx context.Context, conversationID, userID string, before int64, limit int) ([]Message, error) {
+	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx, `SELECT id::text,conversation_id::text,COALESCE(sender_id::text,''),client_message_id::text,body,created_at,kind,COALESCE(duration_ms,0)
+		FROM messages WHERE conversation_id=$1 AND kind='image' AND id>(SELECT cleared_through FROM conversation_members WHERE conversation_id=$1 AND user_id=$4) AND ($2::bigint=0 OR id<$2) ORDER BY id DESC LIMIT $3`, conversationID, before, limit, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make([]Message, 0)
+	for rows.Next() {
+		var m Message
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS); err != nil {
+			return nil, err
+		}
+		m.ImageURL = fmt.Sprintf("/api/messages/%s/image", m.ID)
+		result = append(result, m)
+	}
+	return result, rows.Err()
+}

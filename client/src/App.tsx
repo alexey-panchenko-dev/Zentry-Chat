@@ -2,10 +2,12 @@ import { GroupCreate, GroupView } from './Groups'
 import type { Group } from './Groups'
 import { useDeliveryReceipts } from './useDeliveryReceipts'
 import { messageStatus } from './message-status'
+import { readMessageDraft, writeMessageDraft } from './message-drafts'
 import type { RemovalAction } from './conversation-controls'
 import { ImageComposer } from '@/ImageComposer'
 import { ImageMessage } from '@/ImageMessage'
-import { maskBirthDate, parseBirthDate, birthDatesSupported } from './birthdays'
+import { parseBirthDate, birthDatesSupported } from './birthdays'
+import { BirthDateWheel } from './BirthDateWheel'
 import { useConversationControls } from './useConversationControls'
 import type { ConversationControlView } from './useConversationControls'
 import { blockNotice, messageVisible } from './conversation-controls'
@@ -84,15 +86,15 @@ function Auth() {
     event.preventDefault()
     if(auth.isPending||(register&&!registrationReady))return
     const form=event.currentTarget
-    const fields=Array.from(form.querySelectorAll('input'))
+    const fields=Array.from(form.querySelectorAll<HTMLInputElement>('input:not([type="hidden"])'))
     for(const field of fields){
       let message=''
       if(field.name==='name'&&!/^@?[a-z][a-z0-9_]{2,39}$/i.test(field.value.trim()))message='Придумайте @юзер: 3–40 символов, латинские буквы, цифры и _.'
       else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например you@example.com.'
       else if(field.name==='password'&&(!field.checkValidity()||field.value.length<12||new TextEncoder().encode(field.value).length>72))message='Введите пароль от 12 символов, не более 72 байт.'
-      if(field.name==='birth_date'){try{parseBirthDate(field.value)}catch(e){message=errorText(e)}}
       if(message){setValidation({field:field.name,message});field.focus();return}
     }
+    if(register){try{parseBirthDate(birthDate)}catch(e){setValidation({field:'birth_date',message:errorText(e)});form.querySelector<HTMLElement>('[role="spinbutton"]')?.focus();return}}
     setValidation(null);auth.mutate()
   }
   return <section className="z-auth-card">
@@ -100,7 +102,7 @@ function Auth() {
     <p className="z-muted">{register ? 'Создай профиль и будь на связи.' : 'Войди, чтобы продолжить разговор.'}</p>
     <form noValidate className="z-auth-form" onSubmit={submitAuth}>
       {register && <label>Ник / @юзер<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={41} value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" placeholder="Например, byliver" /></label>}
-      {register&&<label>Дата рождения<input name="birth_date" required inputMode="numeric" autoComplete="bday" placeholder="ДД.ММ.ГГГГ" maxLength={10} value={birthDate} aria-invalid={validation?.field==='birth_date'} aria-describedby={validation?.field==='birth_date'?'auth-validation':undefined} onChange={event=>setBirthDate(maskBirthDate(event.target.value))}/></label>}
+      {register&&<div className="z-auth-birth-date"><label>Дата рождения</label><BirthDateWheel value={birthDate} onChange={setBirthDate} invalid={validation?.field==='birth_date'} describedBy={validation?.field==='birth_date'?'auth-validation':undefined}/></div>}
       <label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
       <label>Пароль<input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type="password" required minLength={12} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register ? 'new-password' : 'current-password'} placeholder="Не менее 12 символов" /></label>
       <p className="z-field-help">От 12 до 72 байт. Латинские буквы и цифры.</p>
@@ -196,7 +198,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
       {searchOpen && <div className="z-search-results">{!query&&<p className="z-field-help">Введи @юзер, имя профиля или точную почту и нажми стрелку.</p>}{users.isFetching&&<p role="status">Поиск…</p>}{users.isError&&<p className="notice">{errorText(users.error)}</p>}{query&&users.data?.length===0&&<p>Никого не найдено.</p>}{query&&users.data?.map(peer=><button className="z-contact" key={peer.id} disabled={create.isPending} onClick={()=>create.mutate(peer.id)}><Avatar user={peer}/><span>{peer.name}<small>{visibleUsername(peer)}</small></span><MessageCircle size={17}/></button>)}</div>}
       {removalNotice&&<p className="z-field-help" role="status">{removalNotice}</p>}
       {create.isError&&<p className="notice">{errorText(create.error)}</p>}
-      <div className="z-conversation-list">{groups.data&&groups.data.length>0&&<><p className="z-list-label">Группы</p>{groups.data.map(group=><button key={group.id} className={'z-conversation'+(selectedGroup?.id===group.id?' is-selected':'')} onClick={()=>{setSelectedGroup(group);setSelected(null);setUiSection('chats');setMobileChat(true)}}><span className="z-group-avatar"><Users size={20}/></span><span><strong>{group.name}</strong><small>{group.member_count} участника</small></span></button>)}<p className="z-list-label">Личные чаты</p></>}{groups.isError&&<p className="notice">{errorText(groups.error)}</p>}{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
+      <div className="z-conversation-list">{groups.data&&groups.data.length>0&&<><p className="z-list-label">Группы</p>{groups.data.map(group=><button key={group.id} className={'z-conversation'+(selectedGroup?.id===group.id?' is-selected':'')} onClick={()=>{setSelectedGroup(group);setSelected(null);setUiSection('chats');setMobileChat(true)}}><span className="z-group-avatar" aria-hidden="true">{group.avatar_url?<img src={group.avatar_url} alt=""/>:<Users size={20}/>}</span><span><strong>{group.name}</strong><small>{group.member_count} участника</small></span></button>)}<p className="z-list-label">Личные чаты</p></>}{groups.isError&&<p className="notice">{errorText(groups.error)}</p>}{dialogs.isError&&<p className="notice">{errorText(dialogs.error)}</p>}{dialogs.isPending&&<p className="z-empty-copy" role="status">Загрузка…</p>}
          {dialogs.data?.pages.flatMap(page=>page.conversations).map(dialog=><button key={dialog.id} onClick={()=>{setSelectedGroup(null);setSelected(dialog);setUiSection('chats');setMobileChat(true)}} className={'z-conversation'+(selected?.id===dialog.id?' is-selected':'')}><Avatar user={dialog.participant}/><span><strong>{dialog.display_name||dialog.participant.name}</strong><small>{dialog.last_message||'Пока нет сообщений'}</small></span>{!!dialog.unread_count&&<b className="z-unread" aria-label={`Непрочитанных сообщений: ${dialog.unread_count}`}>{dialog.unread_count}</b>}</button>)}
         {dialogs.data?.pages[0].conversations.length===0&&<div className="z-empty-copy"><MessageCircle/><p>Твой круг начинается здесь.</p><small>Найди человека по имени или почте.</small></div>}
         {dialogs.hasNextPage&&<button className="secondary" disabled={dialogs.isFetchingNextPage} onClick={()=>void dialogs.fetchNextPage()}>Ещё переписки</button>}
@@ -204,7 +206,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
     </aside>
     <div className="z-workspace">
       <button className="z-mobile-back z-icon" aria-label="Назад к чатам" onClick={()=>{setMobileChat(false);setUiSection('chats')}}><ArrowLeft size={20}/></button>
-      {selectedGroup&&<div className="z-message-view" hidden={uiSection!=='chats'}><GroupView key={selectedGroup.id} group={selectedGroup} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} onBack={()=>setMobileChat(false)}/></div>}
+      {selectedGroup&&<div className="z-message-view" hidden={uiSection!=='chats'}><GroupView key={selectedGroup.id} group={selectedGroup} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} onBack={()=>setMobileChat(false)} onGroupChanged={updated=>{setSelectedGroup(updated);cache.setQueryData<Group[]>(['groups'],old=>old?.map(item=>item.id===updated.id?updated:item))}}/></div>}
       {selected&&<div className="z-message-view" hidden={uiSection!=='chats'}><Messages key={selected.id} conversation={selected} user={user} visible={uiSection==='chats' && (mobileChat || !isMobile)} callActive={callActive} realtimeReady={realtimeReady} controls={controls} onRemoved={conversationRemoved} onProfileCall={()=>setRequestCall({id:crypto.randomUUID(),conversationID:selected.id})}/></div>}
       {uiSection==='profile'?<section className="z-settings z-own-profile"><h1>Мой профиль</h1><div className="z-profile"><ProfilePhoto user={user}/><h2>{user.name}</h2><p className="z-muted">Личный профиль</p></div><ProfileEditor user={user}/></section>:uiSection==='settings'?<section className="z-settings"><h1>Настройки</h1><MediaAvailability feature="contact_profiles"><ContactSettings/></MediaAvailability><label className="z-setting-row">Звуки звонков<input type="checkbox" checked={soundsEnabled} onChange={e=>{setSoundsEnabled(e.target.checked);localStorage.setItem("zently-call-sounds",e.target.checked?"1":"0")}}/></label><p className="z-muted">Вход в аккаунт — по почте и паролю.</p>{logout.isError&&<p className="notice">{errorText(logout.error)}</p>}<button className="secondary z-danger" disabled={logout.isPending} onClick={()=>logout.mutate()}><LogOut size={17}/>Выйти из аккаунта</button></section>
       :uiSection==='discovery'?<Discovery fallbackInterval={realtimeReady?false:60_000} onSettings={()=>setUiSection('profile')}/>
@@ -218,7 +220,8 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
 
 function Messages({ conversation, user, visible, callActive, realtimeReady, onProfileCall, controls, onRemoved }: { conversation: Conversation; user: User; visible:boolean;callActive:boolean;realtimeReady:boolean;onProfileCall:()=>void;controls:ConversationControlView;onRemoved:(id:string,action:RemovalAction)=>void }) {
   const cache = useQueryClient()
-  const [body, setBody] = useState('')
+  const [body, setBody] = useState(()=>{try{return readMessageDraft(localStorage,user.id,conversation.id)}catch{return ''}})
+  useEffect(()=>{try{writeMessageDraft(localStorage,user.id,conversation.id,body)}catch{}},[user.id,conversation.id,body])
   const messageInput = useRef<HTMLTextAreaElement>(null)
   const [imageActive,setImageActive]=useState(false)
   const [voiceActive,setVoiceActive]=useState(false)

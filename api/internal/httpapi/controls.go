@@ -28,7 +28,7 @@ func (h *chatHandlers) changeControls(w http.ResponseWriter, r *http.Request, u 
 	if !readAuthJSON(w, r, &input) {
 		return
 	}
-	if input.Action != "clear" && input.Action != "block" && input.Action != "unblock" && input.Action != "delete_chat" && input.Action != "remove_contact" {
+	if input.Action != "clear" && input.Action != "block" && input.Action != "unblock" && input.Action != "delete_chat" && input.Action != "remove_contact" && input.Action != "delete_everyone" {
 		writeJSON(w, 400, map[string]string{"error": "invalid_control_action"})
 		return
 	}
