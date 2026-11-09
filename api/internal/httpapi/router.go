@@ -60,6 +60,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/profiles/{userID}/photo", ch.signedIn(ch.photo))
 	callHandlers := &callHandlers{store: calls.New(db), publisher: publisher}
 	chatMux.HandleFunc("POST /api/conversations/{id}/calls", ch.signedIn(callHandlers.create))
+	chatMux.HandleFunc("GET /api/calls/history", ch.signedIn(callHandlers.history))
 	chatMux.HandleFunc("GET /api/calls", ch.signedIn(callHandlers.active))
 	chatMux.HandleFunc("GET /api/calls/{callID}", ch.signedIn(callHandlers.get))
 	chatMux.HandleFunc("POST /api/calls/{callID}/actions", ch.signedIn(callHandlers.transition))

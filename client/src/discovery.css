@@ -112,6 +112,22 @@
   overflow-wrap: anywhere;
 }
 .z-like-preview small { color: var(--z-muted); }
+/* Directional, touch-friendly feedback for a dating-card decision. */
+.z-discovery-card{position:relative;isolation:isolate;transform-origin:center 70%;transform-style:preserve-3d;will-change:transform,opacity;overflow:hidden;background:linear-gradient(145deg,#201821,#151217 58%,#121015);transition:transform 520ms cubic-bezier(.2,.8,.2,1),opacity 420ms ease,border-color 320ms ease,box-shadow 360ms ease,background 360ms ease}
+.z-discovery-card::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 360ms ease}
+.z-discovery-card>*{position:relative;z-index:1}
+.z-discovery-card:has(.z-like:hover):not(.is-leaving-like){transform:perspective(1100px) rotateZ(8deg) rotateY(-5deg) translateX(8px);border-color:#b7ff39a8;background:linear-gradient(145deg,#26301c,#171a15 62%,#121015);box-shadow:0 24px 55px #0008,10px 0 38px #b7ff3920,inset 0 1px 0 #b7ff3940}
+.z-discovery-card:has(.z-like:hover)::after{opacity:1;background:radial-gradient(ellipse at 94% 55%,#b7ff3926,transparent 58%)}
+.z-discovery-card:has(.z-skip:hover):not(.is-leaving-skip){transform:perspective(1100px) rotateZ(-8deg) rotateY(5deg) translateX(-8px);border-color:#ff1493a8;background:linear-gradient(215deg,#321625,#1a141a 62%,#121015);box-shadow:0 24px 55px #0008,-10px 0 38px #ff149320,inset 0 1px 0 #ff149340}
+.z-discovery-card:has(.z-skip:hover)::after{opacity:1;background:radial-gradient(ellipse at 5% 55%,#ff149328,transparent 58%)}
+.z-discovery-card.is-leaving-like{transform:translate3d(120%,24px,0) rotateZ(15deg) scale(.9);opacity:0;border-color:#b7ff39;background:#aaff22;box-shadow:32px 14px 60px #b7ff3944;pointer-events:none}
+.z-discovery-card.is-leaving-skip{transform:translate3d(-120%,24px,0) rotateZ(-15deg) scale(.9);opacity:0;border-color:#ff1493;background:#ff1493;box-shadow:-32px 14px 60px #ff149344;pointer-events:none}
+.z-discovery-actions button{transition:transform 280ms cubic-bezier(.2,.8,.2,1),box-shadow 280ms ease,filter 280ms ease}
+.z-discovery-actions .z-like:hover:not(:disabled){transform:scale(1.12) rotate(6deg);box-shadow:0 0 26px #b7ff3970}
+.z-discovery-actions .z-skip:hover:not(:disabled){transform:scale(1.12) rotate(-6deg);box-shadow:0 0 26px #ff149365}
+.z-discovery-card:not(.is-leaving-like):not(.is-leaving-skip){animation:z-discovery-next 440ms cubic-bezier(.2,.8,.2,1) both}
+@keyframes z-discovery-next{from{opacity:0;transform:translateY(20px) scale(.975);filter:blur(5px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.z-discovery-card,.z-discovery-card::after,.z-discovery-actions button{animation:none!important;transition:none!important}.z-discovery-card:has(.z-like:hover),.z-discovery-card:has(.z-skip:hover){transform:none}}
 @media (max-width: 720px) {
   .z-discovery { padding: 70px 18px 24px; }
   .z-discovery h1 { font-size: 21px; }

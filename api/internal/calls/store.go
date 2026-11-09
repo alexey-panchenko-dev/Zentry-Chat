@@ -27,6 +27,20 @@ type Call struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	ExpiresAt      time.Time `json:"expires_at"`
+	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`
+}
+
+type HistoryEntry struct {
+	ID             string     `json:"id"`
+	ConversationID string     `json:"conversation_id"`
+	PeerID         string     `json:"peer_id"`
+	PeerName       string     `json:"peer_name"`
+	Direction      string     `json:"direction"`
+	Status         string     `json:"status"`
+	CreatedAt      time.Time  `json:"created_at"`
+	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`
+	EndedAt        *time.Time `json:"ended_at,omitempty"`
+	DurationMS     int64      `json:"duration_ms"`
 }
 
 type Signal struct {
@@ -40,13 +54,13 @@ type Signal struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
-const columns = `id::text,conversation_id::text,caller_id::text,callee_id::text,client_call_id::text,status,version,created_at,updated_at,expires_at`
+const columns = `id::text,conversation_id::text,caller_id::text,callee_id::text,client_call_id::text,status,version,created_at,updated_at,expires_at,accepted_at`
 
 type scanner interface{ Scan(...any) error }
 
 func scanCall(row scanner) (Call, error) {
 	var c Call
-	err := row.Scan(&c.ID, &c.ConversationID, &c.CallerID, &c.CalleeID, &c.ClientCallID, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt, &c.ExpiresAt)
+	err := row.Scan(&c.ID, &c.ConversationID, &c.CallerID, &c.CalleeID, &c.ClientCallID, &c.Status, &c.Version, &c.CreatedAt, &c.UpdatedAt, &c.ExpiresAt, &c.AcceptedAt)
 	return c, err
 }
 func scanSignal(row scanner) (Signal, error) {
@@ -185,6 +199,30 @@ func (s *Store) Active(ctx context.Context, userID string) ([]Call, error) {
 	return list, tx.Commit(ctx)
 }
 
+func (s *Store) History(ctx context.Context, userID string) ([]HistoryEntry, error) {
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.conversation_id::text,peer.id::text,COALESCE(a.alias,peer.name),
+		CASE WHEN c.caller_id=$1 THEN 'outgoing' ELSE 'incoming' END,c.status,c.created_at,c.accepted_at,
+        CASE WHEN c.status IN ('ended','expired','rejected','cancelled') THEN c.updated_at ELSE NULL END,
+        CASE WHEN c.accepted_at IS NOT NULL AND c.status IN ('ended','expired') THEN GREATEST(0,FLOOR(EXTRACT(EPOCH FROM (c.updated_at-c.accepted_at))*1000))::bigint ELSE 0 END
+        FROM calls c JOIN users peer ON peer.id=CASE WHEN c.caller_id=$1 THEN c.callee_id ELSE c.caller_id END
+        LEFT JOIN contact_aliases a ON a.owner_id=$1 AND a.peer_id=peer.id
+        WHERE (c.caller_id=$1 OR c.callee_id=$1) AND c.status NOT IN ('ringing','accepted')
+        ORDER BY c.created_at DESC LIMIT 100`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := make([]HistoryEntry, 0)
+	for rows.Next() {
+		var item HistoryEntry
+		if err := rows.Scan(&item.ID, &item.ConversationID, &item.PeerID, &item.PeerName, &item.Direction, &item.Status, &item.CreatedAt, &item.AcceptedAt, &item.EndedAt, &item.DurationMS); err != nil {
+			return nil, err
+		}
+		list = append(list, item)
+	}
+	return list, rows.Err()
+}
+
 func (s *Store) Transition(ctx context.Context, id, userID, action string) (Call, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -242,6 +280,7 @@ func (s *Store) Transition(ctx context.Context, id, userID, action string) (Call
 	}
 	if c.Status != target {
 		c, err = scanCall(tx.QueryRow(ctx, `UPDATE calls SET status=$2,version=version+1,updated_at=now(),
+            accepted_at=CASE WHEN $2='accepted' THEN COALESCE(accepted_at,now()) ELSE accepted_at END,
             expires_at=CASE WHEN $2='accepted' THEN now()+interval '2 hours' ELSE expires_at END
             WHERE id=$1 RETURNING `+columns, id, target))
 		if err != nil {
