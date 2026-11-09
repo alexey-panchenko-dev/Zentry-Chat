@@ -79,10 +79,10 @@ func TestDiscoveryMatchAndReadPersistence(t *testing.T) {
 	request(-1, "GET", "/api/discovery", nil, 401)
 	request(0, "GET", "/api/discovery", nil, 403)
 	request(0, "POST", "/api/discovery/votes", map[string]any{"user_id": users[1].ID, "liked": true}, 403)
-	request(0, "PUT", "/api/profile", map[string]any{"name": "Tester", "age": 1, "bio": strings.Repeat("я", 101)}, 400)
+	request(0, "PUT", "/api/profile", map[string]any{"name": "Tester", "age": 1, "bio": strings.Repeat("я", 201)}, 400)
 	request(0, "PUT", "/api/profile", map[string]any{"name": "Tester", "age": -1, "bio": "hello"}, 400)
 	for i, age := range []int{0, 200} {
-		request(i, "PUT", "/api/profile", map[string]any{"name": "Tester", "age": age, "bio": strings.Repeat("я", 100), "city": "Москва"}, 200)
+		request(i, "PUT", "/api/profile", map[string]any{"name": "Tester", "age": age, "bio": strings.Repeat("я", 200), "city": "Москва"}, 200)
 	}
 	discovery := request(0, "GET", "/api/discovery", nil, 200)
 	var profiles []chat.Profile

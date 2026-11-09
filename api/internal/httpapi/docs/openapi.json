@@ -1982,7 +1982,7 @@
           "Discovery"
         ],
         "summary": "Кандидаты для знакомства",
-        "description": "До 30 заполненных профилей. Исключены свой профиль, совпадения, уже отправленные лайки и отклонённые менее 7 дней назад. После голосования запросите следующую карточку.",
+        "description": "До 30 анкет: сначала с общей темой из своего города, затем с общей темой из других городов, затем остальные. Стабильное случайное расположение внутри групп, без рейтинга. Исключены блокировки в обе стороны, неполные профили, свой профиль, совпадения, отправленные лайки и пропуски моложе 7 дней. Для следующей страницы передайте next_cursor.",
         "security": [
           {
             "sessionCookie": []
@@ -2011,7 +2011,19 @@
           "400": {
             "description": "Неверные данные"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 38
+            },
+            "description": "next_cursor из предыдущего ответа."
+          }
+        ]
       }
     },
     "/api/discovery/likes": {
@@ -2049,7 +2061,19 @@
           "400": {
             "description": "Неверные данные"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 38
+            },
+            "description": "next_cursor из предыдущего ответа."
+          }
+        ]
       }
     },
     "/api/discovery/votes": {
@@ -2679,11 +2703,19 @@
           },
           "bio": {
             "type": "string",
-            "maxLength": 100
+            "maxLength": 200
           },
           "city": {
             "type": "string",
             "maxLength": 100
+          },
+          "recommended": {
+            "type": "boolean",
+            "description": "Общая тема в описаниях; не оценка совместимости."
+          },
+          "same_city": {
+            "type": "boolean",
+            "description": "Совпадает нормализованное непустое название города."
           }
         },
         "required": [
@@ -2711,7 +2743,7 @@
           },
           "bio": {
             "type": "string",
-            "maxLength": 100
+            "maxLength": 200
           },
           "city": {
             "type": "string",
@@ -2742,6 +2774,10 @@
               "$ref": "#/components/schemas/Profile"
             },
             "maxItems": 30
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Курсор следующей страницы; пустая строка означает конец выдачи."
           }
         },
         "required": [

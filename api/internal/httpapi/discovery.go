@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"newsChat/api/internal/auth"
+	"newsChat/api/internal/chat"
 	"strconv"
 	"strings"
 	"time"
@@ -31,8 +33,11 @@ func (h *chatHandlers) updateProfile(w http.ResponseWriter, r *http.Request, u a
 	input.Name = strings.TrimSpace(input.Name)
 	input.Bio = strings.TrimSpace(input.Bio)
 	input.City = strings.TrimSpace(input.City)
-	for _, value := range []string{input.Name, input.Bio, input.City} {
-		if !utf8.ValidString(value) || strings.ContainsRune(value, 0) || utf8.RuneCountInString(value) > 100 {
+	for _, field := range []struct {
+		value string
+		limit int
+	}{{input.Name, 100}, {input.Bio, 200}, {input.City, 100}} {
+		if !utf8.ValidString(field.value) || strings.ContainsRune(field.value, 0) || utf8.RuneCountInString(field.value) > field.limit {
 			writeJSON(w, 400, map[string]string{"error": "invalid_profile"})
 			return
 		}
@@ -60,12 +65,16 @@ func (h *chatHandlers) updateProfile(w http.ResponseWriter, r *http.Request, u a
 	writeJSON(w, 200, map[string]any{"profile": p})
 }
 func (h *chatHandlers) discovery(w http.ResponseWriter, r *http.Request, u auth.User) {
-	profiles, err := h.store.Discovery(r.Context(), u.ID, r.URL.Path == "/api/discovery/likes")
+	page, err := h.store.DiscoveryPage(r.Context(), u.ID, r.URL.Path == "/api/discovery/likes", r.URL.Query().Get("cursor"))
 	if err != nil {
+		if errors.Is(err, chat.ErrDiscoveryCursor) {
+			writeJSON(w, 400, map[string]string{"error": "invalid_cursor"})
+			return
+		}
 		chatFailure(w, err)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"profiles": profiles})
+	writeJSON(w, 200, page)
 }
 func (h *chatHandlers) vote(w http.ResponseWriter, r *http.Request, u auth.User) {
 	var input struct {

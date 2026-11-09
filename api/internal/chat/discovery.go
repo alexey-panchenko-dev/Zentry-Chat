@@ -13,9 +13,11 @@ var ErrProfileRequired = errors.New("profile required")
 
 type Profile struct {
 	PublicUser
-	Age  *int   `json:"age"`
-	Bio  string `json:"bio"`
-	City string `json:"city"`
+	Age         *int   `json:"age"`
+	Bio         string `json:"bio"`
+	City        string `json:"city"`
+	Recommended bool   `json:"recommended,omitempty"`
+	SameCity    bool   `json:"same_city,omitempty"`
 }
 
 const profileColumns = `u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),CASE WHEN p.birth_date IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE,p.birth_date))::integer ELSE p.age END,COALESCE(p.bio,''),COALESCE(p.city,'')`
@@ -76,31 +78,8 @@ func (s *Store) UpdateProfileWithBirthDate(ctx context.Context, id, name string,
 	return p, tx.Commit(ctx)
 }
 func (s *Store) Discovery(ctx context.Context, id string, incoming bool) ([]Profile, error) {
-	p, err := s.Profile(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if p.Age == nil || p.Bio == "" {
-		return nil, ErrProfileRequired
-	}
-	filter := `NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id AND (v.liked OR v.updated_at>now()-interval '7 days'))`
-	if incoming {
-		filter = `EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=u.id AND v.target_id=$1 AND v.liked) AND NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id)`
-	}
-	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	result := make([]Profile, 0)
-	for rows.Next() {
-		p, err := scanProfile(rows)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, p)
-	}
-	return result, rows.Err()
+	page, err := s.DiscoveryPage(ctx, id, incoming, "")
+	return page.Profiles, err
 }
 
 // A transaction-level pair lock serializes opposite likes even before a match row exists.

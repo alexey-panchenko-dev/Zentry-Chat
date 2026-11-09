@@ -68,6 +68,10 @@
 .z-discovery-details { display: grid; gap: 10px; min-width: 0; }
 .z-discovery-details h2 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .z-discovery-details p { margin: 0; }
+.z-discovery-recommendation { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--z-lime) 28%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--z-lime) 7%, var(--z-surface)); color: var(--z-lime); }
+.z-discovery-recommendation > svg { flex-shrink: 0; margin-top: 2px; }
+.z-discovery-recommendation strong { display: block; font-size: 12px; font-weight: 600; line-height: 1.5; }
+.z-discovery-recommendation small { display: block; margin-top: 4px; color: var(--z-muted); font-size: 11px; line-height: 1.5; }
 .z-discovery-details .z-muted { font-size: 13px; line-height: 1.5; }
 .z-discovery-bio { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
 .z-discovery-actions { display: flex; justify-content: center; gap: 24px; padding-top: 4px; }

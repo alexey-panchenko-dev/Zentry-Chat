@@ -13,7 +13,8 @@ export function visibleUsername(user: User): string {
   return '@' + handle.charAt(0).toUpperCase() + handle.slice(1)
 }
 export type Conversation = { id: string; participant: User; display_name?:string; last_message?:string; unread_count?: number }
-export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string }
+export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string; recommended?: boolean; same_city?: boolean }
+export type DiscoveryPage = { profiles: Profile[]; next_cursor: string }
 export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string; peer_last_delivered_id?:string }
 export type Message = {
   id: string
