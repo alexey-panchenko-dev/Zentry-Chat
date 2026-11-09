@@ -414,3 +414,51 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 .z-birth-date-field>button{justify-self:end;min-height:46px;padding-inline:19px;border-radius:15px;white-space:nowrap}
 .z-birth-date-field>button:disabled{opacity:.42;filter:saturate(.5);box-shadow:inset 0 1px 0 #ffffff20}
 @media(max-width:560px){.z-birth-date-field{gap:10px}.z-birth-date-field .z-birth-wheel{grid-template-columns:minmax(62px,.72fr) minmax(62px,.72fr) minmax(108px,1.2fr);gap:0}.z-birth-wheel-column{min-height:108px;border-radius:14px}.z-birth-date-field>button{min-height:44px}}
+
+/* Liquid-glass action buttons: a clear rim, soft internal reflection and a slow light pass. */
+.primary,.secondary,.z-icon,.z-collapse,.z-send,.z-attach-photo,.z-call-dock .z-end-call{
+  position:relative;
+  isolation:isolate;
+  -webkit-backdrop-filter:blur(28px) saturate(185%) contrast(1.04);
+  backdrop-filter:blur(28px) saturate(185%) contrast(1.04);
+  box-shadow:inset 0 1px 0 #ffffffa0,inset 0 -1px 0 #ffffff12,0 7px 24px #0005;
+}
+.primary::before,.secondary::before,.z-icon::before,.z-collapse::before,.z-send::before,.z-attach-photo::before,.z-call-dock .z-end-call::before{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(145deg,#ffffff48 0%,#ffffff18 15%,transparent 42%,#ff149311 76%,#b7ff3910 100%);
+  opacity:.62;
+  transition:opacity 360ms cubic-bezier(.2,.75,.25,1),background-position 700ms cubic-bezier(.2,.75,.25,1);
+  background-size:180% 180%;
+  background-position:0% 0%;
+}
+.primary::after,.secondary::after,.z-icon::after,.z-collapse::after,.z-send::after,.z-attach-photo::after,.z-call-dock .z-end-call::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(110deg,transparent 28%,#ffffff1e 46%,#ffffff08 54%,transparent 72%);
+  background-size:220% 100%;
+  background-position:100% 0;
+  opacity:0;
+  transition:background-position 720ms cubic-bezier(.2,.75,.25,1),opacity 240ms ease;
+}
+.primary:hover:not(:disabled)::before,.secondary:hover:not(:disabled)::before,.z-icon:hover:not(:disabled)::before,.z-collapse:hover:not(:disabled)::before,.z-send:hover:not(:disabled)::before,.z-attach-photo:hover:not(:disabled)::before,.z-call-dock .z-end-call:hover:not(:disabled)::before{
+  opacity:.92;
+  background-position:100% 100%;
+}
+.primary:hover:not(:disabled)::after,.secondary:hover:not(:disabled)::after,.z-icon:hover:not(:disabled)::after,.z-collapse:hover:not(:disabled)::after,.z-send:hover:not(:disabled)::after,.z-attach-photo:hover:not(:disabled)::after,.z-call-dock .z-end-call:hover:not(:disabled)::after{
+  background-position:0% 0;
+  opacity:.75;
+}
+.primary:active:not(:disabled),.secondary:active:not(:disabled),.z-icon:active:not(:disabled),.z-collapse:active:not(:disabled),.z-send:active:not(:disabled),.z-attach-photo:active:not(:disabled),.z-call-dock .z-end-call:active:not(:disabled){transform:scale(.96)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .secondary,.z-icon,.z-collapse,.z-attach-photo{background-color:#211c23f5}
+}
+@media(prefers-reduced-motion:reduce){
+  .primary::before,.secondary::before,.z-icon::before,.z-collapse::before,.z-send::before,.z-attach-photo::before,.z-call-dock .z-end-call::before,.primary::after,.secondary::after,.z-icon::after,.z-collapse::after,.z-send::after,.z-attach-photo::after,.z-call-dock .z-end-call::after{transition:none}
+}
