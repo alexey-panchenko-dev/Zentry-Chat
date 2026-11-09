@@ -88,12 +88,17 @@ func (s *Store) ChangeControls(ctx context.Context, id, user, action string) (Co
 		}
 		change.Users = append(change.Users, peer)
 	}
+	if action == "delete_everyone" {
+		change.Users = append(change.Users, peer)
+	}
 	if err = lockConversation(ctx, tx, id, user); err != nil {
 		return change, err
 	}
 	switch action {
 	case "clear", "delete_chat":
 		_, err = tx.Exec(ctx, `UPDATE conversation_members SET cleared_through=GREATEST(cleared_through,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),last_read_id=GREATEST(last_read_id,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),hidden=CASE WHEN $3 THEN true ELSE hidden END WHERE conversation_id=$1 AND user_id=$2`, id, user, action == "delete_chat")
+	case "delete_everyone":
+		_, err = tx.Exec(ctx, `UPDATE conversation_members SET cleared_through=GREATEST(cleared_through,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),last_read_id=GREATEST(last_read_id,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)) WHERE conversation_id=$1`, id)
 	case "remove_contact":
 		_, err = tx.Exec(ctx, `UPDATE conversation_members SET hidden=true WHERE conversation_id=$1 AND user_id=$2`, id, user)
 	case "block":

@@ -11,6 +11,7 @@ import (
 )
 
 var ErrNotFound = errors.New("not found")
+var ErrForbidden = errors.New("forbidden")
 var ErrConflict = errors.New("client message id already used")
 
 type PublicUser struct {

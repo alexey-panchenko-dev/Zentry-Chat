@@ -169,3 +169,20 @@ func TestNewMessageKindsReopenHiddenConversations(t *testing.T) {
 		}
 	}
 }
+
+func TestDeleteConversationForEveryoneClearsBothMembers(t *testing.T) {
+	f := newControlFixture(t)
+	for i, member := range f.users[:2] {
+		id := fmt.Sprintf("eaffffff-ffff-4fff-8fff-%012d", i+1)
+		if _, _, err := f.store.Send(f.ctx, f.conv.ID, member.ID, id, "visible before delete"); err != nil { t.Fatal(err) }
+	}
+	path := "/api/conversations/"+f.conv.ID+"/controls"
+	f.request(t,0,"POST",path,`{"action":"delete_everyone"}`,200)
+	for _, member := range f.users[:2] {
+		state, err := f.store.Controls(f.ctx,f.conv.ID,member.ID)
+		if err != nil { t.Fatal(err) }
+		if state.Hidden || state.ClearedThrough=="0" { t.Fatalf("member did not retain a visible empty chat: %+v",state) }
+		history, err := f.store.Messages(f.ctx,f.conv.ID,member.ID,0,20)
+		if err != nil || len(history)!=0 { t.Fatalf("deleted history remained for member: %v %v",history,err) }
+	}
+}

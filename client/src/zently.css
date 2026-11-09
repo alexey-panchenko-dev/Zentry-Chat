@@ -53,8 +53,9 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .z-composer>.z-voice-composer{margin:0;flex:0 1 auto}
 .z-composer:has(.z-voice-composer[data-active=true])>.z-composer-field,.z-composer:has(.z-voice-composer[data-active=true])>.z-text-send{display:none}
 .z-composer>.z-voice-composer[data-active=true]{flex:1;min-width:0}
-.z-composer>.z-voice-composer[data-phase=error]{position:relative;flex:0 0 auto;order:0}
-.z-voice-composer[data-phase=error] .notice{position:absolute;right:0;bottom:calc(100% + 8px);z-index:8;width:min(320px,calc(100vw - 28px));box-shadow:0 12px 34px #0008}
+.z-composer:has(>.z-voice-composer[data-phase=error]){flex-wrap:wrap}
+.z-composer>.z-voice-composer[data-phase=error]{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:8px;position:static;order:-1;flex:1 1 100%;min-width:0}
+.z-voice-composer[data-phase=error] .notice{position:static;right:auto;bottom:auto;width:auto;min-width:0;margin:0;box-shadow:none}
 
 .z-media-unavailable{display:block;color:var(--z-muted);font-size:11px;line-height:1.5}
 .z-composer:has(>.z-media-unavailable){flex-wrap:wrap}
@@ -151,6 +152,43 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-sidebar,.z-dialogs{background-color:#100b13;background-image:radial-gradient(ellipse 95% 45% at 7% 8%,#ff149326,transparent 74%),radial-gradient(ellipse 85% 48% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 95% 50% at 82% 0%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%;background-repeat:no-repeat}
 
 .z-group-avatar{width:45px;height:45px;border-radius:15px;display:grid;place-items:center;flex-shrink:0;background:linear-gradient(145deg,#ff14933d,#75284e55);border:1px solid #ff14935c;color:#ff70b7}
+.z-chat-header>.z-group-avatar{position:relative;flex:0 0 54px;width:54px;height:54px;min-width:54px;min-height:54px;aspect-ratio:1/1;box-sizing:border-box;padding:0;overflow:hidden;border-radius:16px}
+.z-chat-header>.z-group-avatar img,.z-conversation>.z-group-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.z-chat-header>.z-group-avatar svg{position:relative;z-index:1;width:23px;height:23px}
+.z-group-view .z-chat-header>.z-group-heading{flex:1;min-width:0;padding:0;border:0;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.z-group-view .z-chat-header>.z-group-heading h2,.z-group-view .z-chat-header>.z-group-heading p{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.z-group-view .z-chat-header>.z-group-heading h2{font-size:15px}.z-group-view .z-chat-header>.z-group-heading p{margin-top:4px;color:var(--z-muted);font-size:12px}
+.z-conversation>.z-group-avatar{position:relative;flex:0 0 52px;width:52px;height:52px;min-width:52px;min-height:52px;aspect-ratio:1/1;box-sizing:border-box;padding:0;overflow:hidden;border-radius:16px}
+.z-group-avatar[aria-label]{cursor:pointer}
+.z-group-profile-dialog{width:min(560px,calc(100vw - 24px));max-height:min(86dvh,760px);overflow:auto;background-color:#100b13;background-image:radial-gradient(ellipse 82% 46% at 4% 4%,#ff14932c,transparent 78%),radial-gradient(ellipse 70% 42% at 96% 90%,#b7ff3911,transparent 80%),linear-gradient(155deg,#1a111d 0%,#100c14 60%,#151017);border-color:#ff149359}
+.z-group-profile-main{display:grid;justify-items:center;gap:12px;padding:16px 0 20px;text-align:center}
+.z-group-profile-avatar{position:relative;display:grid;place-items:center;width:112px;height:112px;aspect-ratio:1;border:1px solid #ff14935c;border-radius:24px;overflow:hidden;background:linear-gradient(145deg,#ff14933d,#75284e55);color:#ff70b7}
+.z-group-profile-avatar img{width:100%;height:100%;object-fit:cover}
+.z-group-profile-avatar input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.z-group-profile-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.z-group-profile-stats>div{display:grid;gap:5px;padding:14px;border:1px solid #ff149345;border-radius:16px;background:#ff14930a}
+.z-group-profile-stats strong{font-size:22px}.z-group-profile-stats span{color:var(--z-muted);font-size:12px}
+.z-group-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.z-group-photo-grid .z-image-message,.z-group-photo-grid .z-message-image-button{width:100%;max-width:none}.z-group-photo-grid .z-message-image-button img{aspect-ratio:1;object-fit:cover}
+.z-group-view .z-chat-header>button.z-group-avatar{flex:0 0 54px;width:54px;height:54px}
+.z-birth-date-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px}.z-auth-birth-date{display:grid;gap:8px}.z-birth-wheel{display:grid;grid-template-columns:minmax(64px,.8fr) minmax(64px,.8fr) minmax(112px,1.3fr);gap:10px;width:min(100%,540px)}.z-birth-wheel-column{position:relative;display:grid;grid-template-rows:18px 52px 18px;align-items:center;justify-items:center;min-width:0;padding:4px 6px;overflow:hidden;border:1px solid #ffffff12;border-radius:16px;background:linear-gradient(150deg,#ffffff09,#ffffff03);touch-action:none;user-select:none}.z-birth-wheel-column:focus-within{border-color:var(--z-lime);box-shadow:0 0 0 2px #b7ff3922,0 0 18px #b7ff3914}.z-birth-wheel-column input{width:100%;min-width:0;height:50px;padding:0 4px;border:0!important;border-radius:9px!important;outline:none;background:transparent!important;box-shadow:none!important;text-align:center;color:var(--z-text);font:inherit;font-size:20px;font-variant-numeric:tabular-nums}.z-birth-wheel-column input:focus-visible{outline:0}.z-birth-wheel-neighbor{height:17px;color:var(--z-muted);opacity:.42;font-size:11px;line-height:17px;font-variant-numeric:tabular-nums}.z-birth-wheel-column.is-spinning input{animation:z-birth-spin .18s ease-out}.z-auth-form .z-birth-wheel{margin-top:8px}.z-birth-date-field .z-birth-wheel{width:min(100%,420px)}
+@keyframes z-birth-spin{from{transform:translateY(3px);opacity:.65}to{transform:translateY(0);opacity:1}}
+@media(max-width:560px){.z-birth-date-field{grid-template-columns:1fr}.z-birth-date-field .z-birth-wheel{width:100%}.z-birth-date-field>button{justify-self:start}}
+@media(prefers-reduced-motion:reduce){.z-birth-wheel-column.is-spinning input{animation:none}}
+.z-birth-wheel-column{grid-template-rows:14px 19px 48px 19px;padding:5px 7px;border-color:#ffffff18;background:linear-gradient(160deg,#231a25ee,#141116f5 72%);box-shadow:inset 0 1px #ffffff08;perspective:280px}
+.z-birth-wheel-column::before,.z-birth-wheel-column::after{position:absolute;left:12px;right:12px;height:1px;content:"";pointer-events:none;background:linear-gradient(90deg,transparent,#ff149344 24%,#b7ff3940 76%,transparent)}
+.z-birth-wheel-column::before{top:37px}.z-birth-wheel-column::after{bottom:37px}
+.z-birth-wheel-label{grid-row:1;color:var(--z-muted);font-size:9px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;line-height:14px}
+.z-birth-wheel-neighbor{height:19px;line-height:19px;opacity:.36;filter:blur(.15px);font-size:12px}
+.z-birth-wheel-column input{grid-row:3;height:46px;font-size:22px;font-weight:650;letter-spacing:.045em}
+.z-birth-wheel-column input::selection{color:#100d12;background:#b7ff39}
+.z-birth-wheel-column.is-spinning-up input,.z-birth-wheel-column.is-spinning-up .z-birth-wheel-neighbor{animation:z-birth-drum-up .36s cubic-bezier(.16,.72,.24,1) both}
+.z-birth-wheel-column.is-spinning-down input,.z-birth-wheel-column.is-spinning-down .z-birth-wheel-neighbor{animation:z-birth-drum-down .36s cubic-bezier(.16,.72,.24,1) both}
+.z-birth-wheel-column:active{border-color:#ff14935c;background:linear-gradient(160deg,#2a1927,#171319 72%)}
+@keyframes z-birth-drum-up{from{transform:translateY(22px);opacity:.55}to{transform:translateY(0);opacity:1}}
+@keyframes z-birth-drum-down{from{transform:translateY(-22px);opacity:.55}to{transform:translateY(0);opacity:1}}
+@media(max-width:560px){.z-birth-wheel{grid-template-columns:minmax(60px,.8fr) minmax(60px,.8fr) minmax(100px,1.2fr);gap:8px}.z-birth-wheel-column{min-height:100px;border-radius:14px}}
+@media(prefers-reduced-motion:reduce){.z-birth-wheel-column.is-spinning-up input,.z-birth-wheel-column.is-spinning-down input{animation:none}}
 .z-list-label{padding:8px 12px;margin:10px 0 2px;color:var(--z-muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .z-group-create{width:min(480px,calc(100vw - 24px))}.z-group-name{display:grid;gap:9px;margin:20px 0}.z-group-name input{width:100%;min-height:48px}.z-group-picks{max-height:40dvh;overflow:auto;display:grid;gap:6px}.z-group-pick{display:flex;align-items:center;gap:12px;width:100%;padding:7px 10px;background:#ffffff06;border:1px solid transparent;border-radius:16px;text-align:left}.z-group-pick>span:nth-child(2){flex:1}.z-group-pick.is-picked{border-color:#ff149380;background:#ff149314}.z-group-pick.is-picked>svg{color:var(--z-lime)}.z-group-create .z-photo-actions{justify-content:flex-end;margin-top:16px}
 .z-group-intro{align-self:center;color:var(--z-muted);font-size:11px}.z-group-sender{display:block;margin-bottom:5px;color:#ff9fd0;font-size:11px}.z-group-view .z-chat-header>div:nth-of-type(2){min-width:0;flex:1}.z-group-view .z-chat-header p{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -232,3 +270,206 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-chat-image-dialog::backdrop{background:#08060bdc;backdrop-filter:blur(8px)}
 .z-chat-image-dialog>img{display:block;width:auto;height:auto;max-width:100%;max-height:calc(100dvh - 48px);object-fit:contain;margin:auto;border:0;border-radius:0;box-shadow:none}
 .z-chat-image-dialog .z-close-image{position:fixed;right:max(16px,env(safe-area-inset-right));top:max(16px,env(safe-area-inset-top));z-index:1;color:#f5f3f7;background:#16121988;backdrop-filter:blur(8px)}
+
+/* Frosted glass accents: keep the photo itself clear and soften only its close control. */
+.z-chat-image-dialog .z-close-image{background:linear-gradient(145deg,#ffffff2c,#ffffff0c 52%,#ff14931c);border:1px solid #ffffff45;box-shadow:inset 0 1px 0 #ffffff52,inset 0 -1px 0 #ff149326,0 8px 26px #0008;backdrop-filter:blur(18px) saturate(155%);-webkit-backdrop-filter:blur(18px) saturate(155%);transition:background .18s ease,border-color .18s ease,box-shadow .18s ease}
+.z-chat-image-dialog .z-close-image:hover{background:linear-gradient(145deg,#ffffff3d,#ffffff15 52%,#b7ff3926);border-color:#b7ff3980;box-shadow:inset 0 1px 0 #ffffff66,0 0 16px #b7ff3938,0 8px 26px #0008}
+.z-chat-image-dialog .z-close-image:focus-visible{outline:2px solid #b7ff39;outline-offset:3px}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-chat-image-dialog .z-close-image{background:#211a25f2}}
+
+/* Let the chat atmosphere softly pass through text bubbles, while keeping their colors distinct. */
+.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(145deg,#eb007ecc,#b1005dd9);backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%);box-shadow:inset 0 1px 0 #ffc7e26e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
+.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff14932b,transparent 64%),linear-gradient(135deg,#332630d9,#272129d1 58%,#211d24d4);backdrop-filter:blur(14px) saturate(125%);-webkit-backdrop-filter:blur(14px) saturate(125%);box-shadow:inset 0 1px 0 #ffffff1c,-4px 0 13px #ff14934f,0 8px 24px #00000038}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(150deg,#eb007e,#b1005d)}.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff149326,transparent 64%),linear-gradient(135deg,#332630,#272129 58%,#211d24)}}
+
+/* Sent bubbles stay fully opaque; keep the frosted treatment on received text only. */
+.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(145deg,#eb007e,#b1005d);backdrop-filter:none;-webkit-backdrop-filter:none}
+
+/* Reserve space for every recording action so the mic, cancel, and send buttons never overlap. */
+.z-composer>.z-voice-composer[data-active=true]{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px;align-items:center;gap:8px;width:100%;flex:1 1 100%;min-width:0}
+.z-voice-composer[data-active=true] .z-voice-player{width:100%;min-width:0}
+.z-voice-composer[data-active=true] .z-voice-player audio{width:min(270px,100%)}
+.z-voice-composer[data-active=true]>.z-icon,.z-voice-composer[data-active=true]>.z-send{position:relative;z-index:1;width:44px;height:44px;min-width:44px;min-height:44px;flex-shrink:0}
+.z-voice-composer[data-active=true]>.z-send{background:var(--z-lime);color:#101013;box-shadow:0 0 18px #b7ff3940}
+@media(max-width:480px){.z-voice-composer[data-active=true]{grid-template-columns:minmax(0,1fr) 40px 40px;gap:6px}.z-voice-composer[data-active=true]>.z-icon,.z-voice-composer[data-active=true]>.z-send{width:40px;height:40px;min-width:40px;min-height:40px}.z-voice-composer[data-active=true] .z-voice-player audio{width:min(220px,100%)}}
+@media(prefers-reduced-motion:reduce){.z-chat-image-dialog .z-close-image{transition:none}}
+
+/* Keep the floating call action within the chat header's reserved action lane. */
+.z-call-panel.is-idle:not(.no-peer){right:60px;top:27px}
+@media(max-width:720px){.z-call-panel.is-idle:not(.no-peer){right:16px;top:24px}}
+
+.z-contact-photo-gallery{display:grid;gap:10px;width:100%;margin:4px 0 8px;text-align:left}
+.z-contact-photo-gallery h4{margin:0;font-size:13px;font-weight:650}
+.z-contact-photo-gallery>p{margin:0;font-size:11px}
+.z-contact-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;width:100%}
+.z-contact-photo-tile{min-width:0;overflow:hidden;border:1px solid #ff79b04d;border-radius:12px;background:#211b24;box-shadow:0 4px 14px #0004}
+.z-contact-photo-grid .z-image-message{width:100%;max-width:100%}
+.z-contact-photo-grid .z-message-image-button{width:100%;height:78px;border-radius:0;background:transparent}
+.z-contact-photo-grid .z-message-image-button img{width:100%;height:100%;aspect-ratio:auto;object-fit:cover}
+.z-contact-photo-gallery>.secondary{justify-self:center}
+@media(max-width:480px){.z-contact-photo-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.z-contact-photo-grid .z-message-image-button{height:68px}}
+
+.z-phone-control{display:grid;grid-template-columns:minmax(128px,.9fr) minmax(0,1.4fr);gap:8px;width:100%}
+.z-phone-control select,.z-phone-control input{width:100%;min-width:0;min-height:48px;padding:10px 12px;border:1px solid #ff79b02e;border-radius:15px;background:linear-gradient(140deg,#2a202b,#1e1922);color:var(--z-text);font:inherit}
+.z-phone-control select{appearance:auto;color-scheme:dark}
+.z-phone-control input:focus-visible,.z-phone-control select:focus-visible{outline:2px solid #b7ff39;outline-offset:2px}
+@media(max-width:480px){.z-phone-control{grid-template-columns:minmax(0,1fr)}.z-phone-control select,.z-phone-control input{min-height:46px}}
+
+/* Recorder errors should not push the message composer onto extra rows. */
+.z-composer{position:relative}
+.z-composer:has(>.z-voice-composer[data-phase="error"]){flex-wrap:nowrap}
+.z-composer>.z-voice-composer[data-phase="error"]{display:contents;order:initial;flex:initial;width:auto}
+.z-composer>.z-voice-composer[data-phase="error"] .notice{position:absolute;right:0;bottom:calc(100% + 10px);z-index:5;width:min(460px,calc(100vw - 40px));margin:0;box-shadow:0 14px 38px #0006;animation:z-surface-in 180ms var(--z-motion-ease) both}
+
+/* Zently motion language: quick, quiet transitions with no layout shifts. */
+:root{--z-motion-fast:150ms;--z-motion-ui:240ms;--z-motion-enter:320ms;--z-motion-press:120ms;--z-motion-ease:cubic-bezier(.22,.68,.2,1)}
+@keyframes z-surface-in{from{opacity:0;transform:translateY(7px) scale(.994)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-message-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-dialog-in{from{opacity:0;transform:translateY(12px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-photo-in{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:scale(1)}}
+@keyframes z-pulse-ring{0%{box-shadow:0 0 0 0 #b7ff3940}70%{box-shadow:0 0 0 7px #b7ff3900}100%{box-shadow:0 0 0 0 #b7ff3900}}
+@keyframes z-spin{to{transform:rotate(360deg)}}
+
+.z-sidebar,.z-dialogs,.z-workspace{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background-color var(--z-motion-ui) ease}
+.z-shell>.z-sidebar{animation:z-surface-in 300ms var(--z-motion-ease) both}
+.z-shell>.z-dialogs{animation:z-surface-in 340ms var(--z-motion-ease) 45ms both}
+.z-shell>.z-workspace{animation:z-surface-in 380ms var(--z-motion-ease) 90ms both}
+.z-shell[data-ui-section="profile"] .z-settings,.z-shell[data-ui-section="settings"] .z-settings,.z-shell[data-ui-section="discovery"] .z-discovery,.z-shell[data-ui-section="calls"] .z-call-lobby,.z-shell[data-ui-section="chats"] .z-message-view:not([hidden]){animation:z-surface-in var(--z-motion-enter) var(--z-motion-ease) both}
+.z-auth-card{animation:z-surface-in 420ms var(--z-motion-ease) both}
+
+button,.z-search,.z-composer-field,.z-chat-header,.z-contact,.z-group-pick,.z-profile-image-button,.z-group-profile-avatar,.z-photo-picker,.z-discovery-card,.z-message-image-button,.z-voice-player,.z-contact-photo-tile{transition:background-color var(--z-motion-fast) ease,border-color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease,color var(--z-motion-fast) ease,filter var(--z-motion-fast) ease,transform var(--z-motion-fast) var(--z-motion-ease),opacity var(--z-motion-fast) ease}
+button:active:not(:disabled){transform:scale(1.035);transition-duration:var(--z-motion-press)}
+.z-conversation:active:not(:disabled),.z-contact:active:not(:disabled),.z-group-pick:active:not(:disabled),.z-sidebar nav button:active:not(:disabled){transform:scale(1.012)}
+.z-sidebar nav button{transition:background-color var(--z-motion-ui) ease,color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease,transform var(--z-motion-fast) var(--z-motion-ease)}
+.z-sidebar nav button.is-active{transition:background-color var(--z-motion-ui) ease,color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease}
+.z-conversation.is-selected{transition:background var(--z-motion-ui) ease,border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease}
+.z-avatar{transition:box-shadow var(--z-motion-ui) ease,transform var(--z-motion-ui) var(--z-motion-ease)}
+input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background-color var(--z-motion-ui) ease}
+.z-composer-field:focus-within,.z-search:focus-within{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background var(--z-motion-ui) ease}
+.z-bubble-row:nth-last-child(2){animation:z-message-in 240ms var(--z-motion-ease) both}
+.z-chat-image-dialog[open]>img{animation:z-photo-in 220ms var(--z-motion-ease) both}
+.z-chat-image-dialog[open] .z-close-image{animation:z-surface-in 240ms var(--z-motion-ease) both}
+.z-contact-dialog[open],.z-call-dialog[open]{animation:z-dialog-in 260ms var(--z-motion-ease) both;transform-origin:center}
+.z-contact-dialog::backdrop,.z-call-dialog::backdrop,.z-chat-image-dialog::backdrop{animation:z-backdrop-in 200ms ease both}
+@keyframes z-backdrop-in{from{opacity:0}to{opacity:1}}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch:hover{box-shadow:0 0 0 4px #b7ff3918,0 0 20px #b7ff3928}
+.z-call-dock .z-icon:hover,.z-send:hover:not(:disabled){box-shadow:0 0 18px #b7ff3930}
+.z-connection[open] .z-connection-popover{animation:z-surface-in 180ms var(--z-motion-ease) both}
+.z-group-pick.is-picked{transition:background var(--z-motion-ui) ease,border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease}
+.z-unread{animation:z-pulse-ring 720ms ease-out 1}
+.z-loading>svg{animation:z-spin 1.4s linear infinite;transform-origin:center}
+@media(hover:hover) and (pointer:fine){
+  .primary:hover:not(:disabled),.secondary:hover:not(:disabled),.z-send:hover:not(:disabled),.z-icon:hover:not(:disabled),.z-collapse:hover:not(:disabled){transform:translateY(-1px)}
+  .z-sidebar nav button:hover{transform:translateX(2px)}
+  .z-conversation:hover,.z-group-pick:hover,.z-contact:hover{transform:translateY(-1px)}
+  .z-account:hover .z-avatar,.z-conversation:hover .z-avatar{transform:scale(1.035)}
+  .z-message-image-button:hover{transform:translateY(-1px)}
+  .z-discovery-card:hover{transform:translateY(-2px)}
+  .z-contact-photo-tile:hover{transform:translateY(-2px);border-color:#b7ff3980;box-shadow:0 0 14px #b7ff3920}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .z-unread{animation:none}
+}
+
+/* Liquid-glass accents: reserve the stronger blur for compact action buttons. */
+.z-list-top>div{gap:8px;align-items:center}
+.z-list-top>div>.z-icon{flex:0 0 42px;width:42px;height:42px}
+.secondary,.z-icon,.z-collapse,.z-attach-photo,.z-send,.z-call-dock .z-icon,.z-call-dock .z-end-call{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  border:1px solid #ffffff30;
+  background-image:linear-gradient(145deg,#ffffff2b 0%,#ffffff0c 42%,#ff14931b 100%);
+  -webkit-backdrop-filter:blur(24px) saturate(170%);
+  backdrop-filter:blur(24px) saturate(170%);
+  box-shadow:inset 0 1px 0 #ffffff50,inset 0 -1px 0 #ffffff10,0 5px 18px #0004;
+}
+.secondary{background-color:#211c238c;border-color:#ffffff25}
+.z-icon,.z-collapse,.z-attach-photo{background-color:#211c2370;border-color:#ffffff20}
+.z-send{background-color:#b7ff39cc;border-color:#e4ffae80;color:#101013;box-shadow:inset 0 1px 0 #ffffffad,inset 0 -2px 0 #648b2d30,0 6px 20px #b7ff3925}
+.z-call-dock .z-icon{background-color:#211c237d}
+.z-call-dock .z-end-call{background-color:#ff1744d9;border-color:#ff9aaa70}
+.primary{position:relative;isolation:isolate;border-color:#efffc16e;background-color:#b7ff39d9;background-image:linear-gradient(145deg,#e7ffc47a,#b7ff39aa 52%,#91d31eb8);-webkit-backdrop-filter:blur(22px) saturate(165%);backdrop-filter:blur(22px) saturate(165%);box-shadow:inset 0 1px 0 #ffffffa6,inset 0 -2px 0 #638d2b30,0 7px 22px #b7ff3924}
+.primary:hover:not(:disabled),.secondary:hover:not(:disabled),.z-icon:hover:not(:disabled),.z-collapse:hover:not(:disabled),.z-attach-photo:hover:not(:disabled),.z-send:hover:not(:disabled){border-color:#ffffff70;box-shadow:inset 0 1px 0 #ffffff75,0 0 18px #ff149326,0 8px 24px #0005}
+.primary:active:not(:disabled),.z-send:active:not(:disabled){box-shadow:inset 0 1px 0 #ffffff90,0 0 22px #b7ff3945}
+.secondary:active:not(:disabled),.z-icon:active:not(:disabled),.z-collapse:active:not(:disabled),.z-attach-photo:active:not(:disabled){background-image:linear-gradient(145deg,#ffffff3d 0%,#ffffff16 42%,#ff14932a 100%)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .secondary{background-color:#211c23f2}.z-icon,.z-collapse,.z-attach-photo{background-color:#211c23f2}.z-send,.primary{background-color:var(--z-lime)}
+}
+
+/* Birth-date selector: one shared surface instead of three competing cards. */
+.z-birth-date-field{grid-template-columns:minmax(0,1fr);align-items:start;gap:12px}
+.z-birth-date-field>div{display:grid;gap:8px;min-width:0}
+.z-birth-date-field>div>label{color:#e7dfe9;font-size:13px;font-weight:650;letter-spacing:.01em}
+.z-birth-date-field .z-birth-wheel{width:min(100%,430px);grid-template-columns:minmax(70px,.72fr) minmax(70px,.72fr) minmax(124px,1.2fr);gap:0;padding:5px;border:1px solid #ffffff1b;border-radius:21px;background:radial-gradient(ellipse at 12% 0%,#ff149317,transparent 54%),linear-gradient(155deg,#ffffff0b,#211a24e8 48%,#151116f5);box-shadow:inset 0 1px 0 #ffffff13,0 10px 28px #0003}
+.z-birth-wheel-column{grid-template-rows:16px 20px 44px 20px;min-height:112px;padding:7px 8px;border:0;border-radius:15px;background:transparent;box-shadow:none;perspective:320px}
+.z-birth-wheel-column:not(:last-child){border-right:1px solid #ffffff16;border-radius:0}
+.z-birth-wheel-column::before,.z-birth-wheel-column::after{left:16px;right:16px;background:linear-gradient(90deg,transparent,#ff149326 22%,#ffffff20 50%,#b7ff3924 78%,transparent)}
+.z-birth-wheel-column::before{top:39px}.z-birth-wheel-column::after{bottom:39px}
+.z-birth-wheel-label{color:#bdb4c0;font-size:9px;letter-spacing:.12em}
+.z-birth-wheel-neighbor{color:#c1b7c4;opacity:.32;filter:blur(.25px);font-variant-numeric:tabular-nums}
+.z-birth-wheel-column input{height:44px;font-size:23px;font-weight:700;letter-spacing:.055em;text-shadow:0 1px 14px #ffffff16}
+.z-birth-wheel-column:focus-within{border-color:transparent;border-radius:14px;background:linear-gradient(160deg,#ffffff0b,#ff14930a);box-shadow:inset 0 0 0 1px #b7ff3940}
+.z-birth-date-field>button{justify-self:end;min-height:46px;padding-inline:19px;border-radius:15px;white-space:nowrap}
+.z-birth-date-field>button:disabled{opacity:.42;filter:saturate(.5);box-shadow:inset 0 1px 0 #ffffff20}
+@media(max-width:560px){.z-birth-date-field{gap:10px}.z-birth-date-field .z-birth-wheel{grid-template-columns:minmax(62px,.72fr) minmax(62px,.72fr) minmax(108px,1.2fr);gap:0}.z-birth-wheel-column{min-height:108px;border-radius:14px}.z-birth-date-field>button{min-height:44px}}
+
+/* Liquid-glass action buttons: a clear rim, soft internal reflection and a slow light pass. */
+.primary,.secondary,.z-icon,.z-collapse,.z-send,.z-attach-photo,.z-call-dock .z-end-call{
+  position:relative;
+  isolation:isolate;
+  -webkit-backdrop-filter:blur(28px) saturate(185%) contrast(1.04);
+  backdrop-filter:blur(28px) saturate(185%) contrast(1.04);
+  box-shadow:inset 0 1px 0 #ffffffa0,inset 0 -1px 0 #ffffff12,0 7px 24px #0005;
+}
+.primary::before,.secondary::before,.z-icon::before,.z-collapse::before,.z-send::before,.z-attach-photo::before,.z-call-dock .z-end-call::before{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(145deg,#ffffff48 0%,#ffffff18 15%,transparent 42%,#ff149311 76%,#b7ff3910 100%);
+  opacity:.62;
+  transition:opacity 360ms cubic-bezier(.2,.75,.25,1),background-position 700ms cubic-bezier(.2,.75,.25,1);
+  background-size:180% 180%;
+  background-position:0% 0%;
+}
+.primary::after,.secondary::after,.z-icon::after,.z-collapse::after,.z-send::after,.z-attach-photo::after,.z-call-dock .z-end-call::after{
+  content:"";
+  position:absolute;
+  inset:1px;
+  border-radius:inherit;
+  pointer-events:none;
+  background:linear-gradient(110deg,transparent 28%,#ffffff1e 46%,#ffffff08 54%,transparent 72%);
+  background-size:220% 100%;
+  background-position:100% 0;
+  opacity:0;
+  transition:background-position 720ms cubic-bezier(.2,.75,.25,1),opacity 240ms ease;
+}
+.primary:hover:not(:disabled)::before,.secondary:hover:not(:disabled)::before,.z-icon:hover:not(:disabled)::before,.z-collapse:hover:not(:disabled)::before,.z-send:hover:not(:disabled)::before,.z-attach-photo:hover:not(:disabled)::before,.z-call-dock .z-end-call:hover:not(:disabled)::before{
+  opacity:.92;
+  background-position:100% 100%;
+}
+.primary:hover:not(:disabled)::after,.secondary:hover:not(:disabled)::after,.z-icon:hover:not(:disabled)::after,.z-collapse:hover:not(:disabled)::after,.z-send:hover:not(:disabled)::after,.z-attach-photo:hover:not(:disabled)::after,.z-call-dock .z-end-call:hover:not(:disabled)::after{
+  background-position:0% 0;
+  opacity:.75;
+}
+.primary:active:not(:disabled),.secondary:active:not(:disabled),.z-icon:active:not(:disabled),.z-collapse:active:not(:disabled),.z-send:active:not(:disabled),.z-attach-photo:active:not(:disabled),.z-call-dock .z-end-call:active:not(:disabled){transform:scale(.96)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .secondary,.z-icon,.z-collapse,.z-attach-photo{background-color:#211c23f5}
+}
+@media(prefers-reduced-motion:reduce){
+  .primary::before,.secondary::before,.z-icon::before,.z-collapse::before,.z-send::before,.z-attach-photo::before,.z-call-dock .z-end-call::before,.primary::after,.secondary::after,.z-icon::after,.z-collapse::after,.z-send::after,.z-attach-photo::after,.z-call-dock .z-end-call::after{transition:none}
+}
+
+/* Align the floating call action with the history control in the chat header. */
+.z-messages:not(.z-group-view)>.z-chat-header{padding-right:50px}
+.z-call-panel.is-idle:not(.no-peer){top:27px;right:16px}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch{display:grid;place-items:center;width:35px;height:35px;min-width:35px;min-height:35px;padding:0;flex:0 0 35px}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch svg{width:18px;height:18px}
+@media(max-width:720px){
+  .z-messages:not(.z-group-view)>.z-chat-header{padding-right:50px;gap:5px}
+  .z-call-panel.is-idle:not(.no-peer){top:24px;right:16px}
+  .z-call-panel.is-idle:not(.no-peer) .z-call-launch{width:28px;height:32px;min-width:28px;min-height:32px;flex-basis:28px}
+}

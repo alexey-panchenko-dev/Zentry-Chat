@@ -4,16 +4,18 @@ import { blockNotice, isRemovalAction, removalCommitted } from './conversation-c
 import type { ControlAction, RemovalAction } from './conversation-controls'
 import type { ConversationControlView } from './useConversationControls'
 import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { MoreHorizontal, Phone, X } from 'lucide-react'
 import { api, errorText, visibleUsername } from '@/api'
-import type { Conversation, User } from '@/api'
+import type { Conversation, Message, User } from '@/api'
 import { Avatar } from '@/Visual'
+import { ImageMessage } from '@/ImageMessage'
 export type PeerProfile=User&{phone?:string;birthday?:string;sent_count?:number;received_count?:number;online?:boolean;display_name?:string}
-const actionLabel:Record<ControlAction,string>={clear:'Очистить историю',delete_chat:'Удалить чат',remove_contact:'Удалить контакт',block:'Заблокировать',unblock:'Разблокировать'}
+const actionLabel:Record<ControlAction,string>={clear:'Очистить историю',delete_chat:'Удалить только у меня',delete_everyone:'Удалить у всех',remove_contact:'Удалить контакт',block:'Заблокировать',unblock:'Разблокировать'}
 const actionDescription:Record<ControlAction,string>={
  clear:'Очистить историю этой переписки только у вас? У собеседника сообщения сохранятся.',
  delete_chat:'Удалить чат только у вас? История будет очищена, а переписка исчезнет из вашего списка. У собеседника сообщения сохранятся.',
+ delete_everyone:'Удалить переписку у вас и собеседника? Все текущие сообщения исчезнут у обоих. Новые сообщения после этого будут отображаться как обычно.',
  remove_contact:'Удалить контакт из вашего списка? Переписка будет скрыта только у вас, история сохранится. Собеседник не будет заблокирован.',
  block:'Заблокировать контакт? Сообщения и звонки между вами станут недоступны до разблокировки.',
  unblock:'Разблокировать контакт и снова разрешить сообщения и звонки?',
@@ -31,6 +33,8 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  const [aliasDraft,setAliasDraft]=useState<string|null>(null)
  const [editingContact,setEditingContact]=useState(false)
  const profile=useQuery({queryKey:['contact-profile',conversation.id],queryFn:async({signal})=>(await api.get<{profile:PeerProfile}>(`/conversations/${conversation.id}/profile`,{signal})).data.profile,retry:false})
+ const photos=useInfiniteQuery({enabled:!!profile.data&&!profile.isError,queryKey:['conversation-images',conversation.id],initialPageParam:'',queryFn:async({pageParam,signal})=>(await api.get<{images:Message[];next_cursor:string}>(`/conversations/${conversation.id}/images`,{params:{before:pageParam||undefined,limit:12},signal})).data,getNextPageParam:page=>page.next_cursor||undefined,retry:false})
+ const chatPhotos=photos.data?.pages.flatMap(page=>page.images)??[]
  const alias=aliasDraft??profile.data?.display_name??conversation.display_name??''
  const saveAlias=useMutation({mutationFn:async()=> (await api.put<{alias:string}>(`/conversations/${conversation.id}/alias`,{alias:alias.trim()})).data.alias,onSuccess:next=>{setAliasDraft(null);setEditingContact(false);cache.setQueryData<PeerProfile>(['contact-profile',conversation.id],old=>old?{...old,display_name:next}:old);void cache.invalidateQueries({queryKey:['conversations']})}})
  useEffect(()=>{const element=dialog.current;element?.showModal();return()=>element?.close()},[])
@@ -62,7 +66,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  }}>
  <div className="z-contact-dialog-head"><h2 id="contact-profile-title">{confirmation?'Подтвердите действие':'Профиль'}</h2><div className="z-contact-top-actions">
  {controls.supported&&!confirmation&&<details ref={menu} className="z-contact-more" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))event.currentTarget.open=false}}><summary className="z-icon" aria-label="Действия с контактом" title="Действия с контактом"><MoreHorizontal/></summary><div className="z-contact-menu">
- {controls.removalSupported&&<><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_chat')}>Удалить чат</button><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('remove_contact')}>Удалить контакт</button></>}
+ {controls.removalSupported&&<><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_everyone')}>Удалить у всех</button><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_chat')}>Удалить только у меня</button></>}
  <button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose(controls.state?.blocked_by_me?'unblock':'block')}>{controls.state?.blocked_by_me?'Разблокировать':'Заблокировать'}</button>
  </div></details>}
  <button type="button" className="z-icon" aria-label="Закрыть профиль" autoFocus disabled={controls.action.isPending} onClick={close}><X/></button></div></div>
@@ -74,6 +78,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  {profile.data?.username&&(editingContact?<form className="z-contact-alias" onSubmit={event=>{event.preventDefault();if(!saveAlias.isPending&&alias.trim())saveAlias.mutate()}}><label>Как сохранить контакт<input autoFocus value={alias} maxLength={80} placeholder={peer.name} onChange={event=>setAliasDraft(event.target.value)}/></label><div><button type="submit" className="primary" disabled={saveAlias.isPending||!alias.trim()}>{saveAlias.isPending?'Сохраняем…':'Сохранить контакт'}</button><button type="button" className="secondary" disabled={saveAlias.isPending} onClick={()=>{setEditingContact(false);setAliasDraft(null);saveAlias.reset()}}>Отмена</button></div>{saveAlias.isError&&<p className="notice" role="alert">{errorText(saveAlias.error)}</p>}</form>:<button type="button" className="secondary" onClick={()=>{setAliasDraft(profile.data?.display_name||peer.name);saveAlias.reset();setEditingContact(true)}}>{profile.data.display_name?'Изменить имя':'Добавить в контакты'}</button>)}
  {profile.data&&!profile.isFetching&&!profile.isError&&<dl className="z-contact-details"><dt>День рождения</dt><dd>{birthday?birthday.label+(peer.birthday?.length===10?' '+peer.birthday.slice(0,4):''):'Не указан'}{birthday?.today&&<strong className="z-birthday-today"> · Сегодня 🎉</strong>}</dd></dl>}
  {profile.data&&!profile.isError&&typeof peer.sent_count==='number'&&typeof peer.received_count==='number'&&<div className="z-message-counts"><div><strong>{peer.sent_count}</strong><span>Вы отправили</span></div><div><strong>{peer.received_count}</strong><span>Вам отправили</span></div></div>}
+ {profile.data&&!profile.isError&&<section className="z-contact-photo-gallery" aria-labelledby="contact-photos-title"><h4 id="contact-photos-title">Фото из чата</h4>{photos.isPending?<p role="status" className="z-muted">Загружаем фотографии…</p>:photos.isError?<div><p className="notice" role="alert">Не удалось загрузить фото из чата.</p><button type="button" className="secondary" onClick={()=>void photos.refetch()}>Повторить</button></div>:chatPhotos.length===0?<p className="z-muted">В этой переписке пока нет фотографий.</p>:<><div className="z-contact-photo-grid">{chatPhotos.map(photo=><div key={photo.id} className="z-contact-photo-tile"><ImageMessage url={photo.image_url}/></div>)}</div>{photos.hasNextPage&&<button type="button" className="secondary" disabled={photos.isFetchingNextPage} onClick={()=>void photos.fetchNextPage()}>{photos.isFetchingNextPage?'Загружаем…':'Показать ещё фото'}</button>}</>}</section>}
  {notice&&<p className="notice" role="status">{notice}</p>}
  <button type="button" className="primary" disabled={callBusy||controls.blocked||controls.unavailable} onClick={()=>{close();onCall()}}><Phone size={19}/>Позвонить</button>{callBusy&&<p className="z-field-help">Сначала завершите текущий звонок.</p>}
  {controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<div><p className="notice" role="alert">{errorText(controls.error)}</p><button className="secondary" type="button" onClick={()=>void controls.refetch()}>Повторить</button></div>}{completed&&<p role="status">{completed}</p>}

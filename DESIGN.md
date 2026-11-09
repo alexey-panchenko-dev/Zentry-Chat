@@ -67,3 +67,8 @@ Contact profiles show sent and received counts from the viewer's visible history
 The registration nickname is the unique @username, rather than a separately generated identity. Existing technical handles are replaced with an already unique, valid profile name where possible. Others choose their @username in the own profile. A private contact name is shown above the contact's public @username and is never shared with the peer.
 
 The private contact-name field appears before the birthday in the contact profile. Full-size chat photos sit centered on a dim, blurred backdrop without a surrounding card; the close control remains at the upper right.
+
+## Motion language
+Motion is quick and quiet: app panels and section changes ease in once; new messages, native dialogs, photo viewing and connection popovers use short opacity/position transitions. Buttons, navigation, contact rows and image tiles respond to hover or press without changing layout. The unread badge gets a single soft lime pulse; no interface element continuously flashes. Reduced-motion preferences minimize all transitions and entrance effects. Keep animation restrained so chat scrolling and message reading stay stable, especially on mobile.
+
+Compact action controls use a liquid-glass finish: stronger backdrop blur and saturation, translucent pink/graphite or lime tint, a thin bright rim and soft inner reflection. Preserve opaque fallbacks and keep the effect on buttons only; message surfaces and navigation panels retain their existing materials.
