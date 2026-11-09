@@ -182,11 +182,11 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-birth-wheel-neighbor{height:19px;line-height:19px;opacity:.36;filter:blur(.15px);font-size:12px}
 .z-birth-wheel-column input{grid-row:3;height:46px;font-size:22px;font-weight:650;letter-spacing:.045em}
 .z-birth-wheel-column input::selection{color:#100d12;background:#b7ff39}
-.z-birth-wheel-column.is-spinning-up input{animation:z-birth-spin-up .24s cubic-bezier(.2,.72,.3,1)}
-.z-birth-wheel-column.is-spinning-down input{animation:z-birth-spin-down .24s cubic-bezier(.2,.72,.3,1)}
+.z-birth-wheel-column.is-spinning-up input,.z-birth-wheel-column.is-spinning-up .z-birth-wheel-neighbor{animation:z-birth-drum-up .36s cubic-bezier(.16,.72,.24,1) both}
+.z-birth-wheel-column.is-spinning-down input,.z-birth-wheel-column.is-spinning-down .z-birth-wheel-neighbor{animation:z-birth-drum-down .36s cubic-bezier(.16,.72,.24,1) both}
 .z-birth-wheel-column:active{border-color:#ff14935c;background:linear-gradient(160deg,#2a1927,#171319 72%)}
-@keyframes z-birth-spin-up{from{transform:translateY(11px) rotateX(-16deg);opacity:.28;filter:blur(1px)}to{transform:translateY(0) rotateX(0);opacity:1;filter:blur(0)}}
-@keyframes z-birth-spin-down{from{transform:translateY(-11px) rotateX(16deg);opacity:.28;filter:blur(1px)}to{transform:translateY(0) rotateX(0);opacity:1;filter:blur(0)}}
+@keyframes z-birth-drum-up{from{transform:translateY(22px);opacity:.55}to{transform:translateY(0);opacity:1}}
+@keyframes z-birth-drum-down{from{transform:translateY(-22px);opacity:.55}to{transform:translateY(0);opacity:1}}
 @media(max-width:560px){.z-birth-wheel{grid-template-columns:minmax(60px,.8fr) minmax(60px,.8fr) minmax(100px,1.2fr);gap:8px}.z-birth-wheel-column{min-height:100px;border-radius:14px}}
 @media(prefers-reduced-motion:reduce){.z-birth-wheel-column.is-spinning-up input,.z-birth-wheel-column.is-spinning-down input{animation:none}}
 .z-list-label{padding:8px 12px;margin:10px 0 2px;color:var(--z-muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
@@ -314,3 +314,103 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-phone-control select{appearance:auto;color-scheme:dark}
 .z-phone-control input:focus-visible,.z-phone-control select:focus-visible{outline:2px solid #b7ff39;outline-offset:2px}
 @media(max-width:480px){.z-phone-control{grid-template-columns:minmax(0,1fr)}.z-phone-control select,.z-phone-control input{min-height:46px}}
+
+/* Recorder errors should not push the message composer onto extra rows. */
+.z-composer{position:relative}
+.z-composer:has(>.z-voice-composer[data-phase="error"]){flex-wrap:nowrap}
+.z-composer>.z-voice-composer[data-phase="error"]{display:contents;order:initial;flex:initial;width:auto}
+.z-composer>.z-voice-composer[data-phase="error"] .notice{position:absolute;right:0;bottom:calc(100% + 10px);z-index:5;width:min(460px,calc(100vw - 40px));margin:0;box-shadow:0 14px 38px #0006;animation:z-surface-in 180ms var(--z-motion-ease) both}
+
+/* Zently motion language: quick, quiet transitions with no layout shifts. */
+:root{--z-motion-fast:150ms;--z-motion-ui:240ms;--z-motion-enter:320ms;--z-motion-press:120ms;--z-motion-ease:cubic-bezier(.22,.68,.2,1)}
+@keyframes z-surface-in{from{opacity:0;transform:translateY(7px) scale(.994)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-message-in{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-dialog-in{from{opacity:0;transform:translateY(12px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes z-photo-in{from{opacity:0;transform:scale(.975)}to{opacity:1;transform:scale(1)}}
+@keyframes z-pulse-ring{0%{box-shadow:0 0 0 0 #b7ff3940}70%{box-shadow:0 0 0 7px #b7ff3900}100%{box-shadow:0 0 0 0 #b7ff3900}}
+@keyframes z-spin{to{transform:rotate(360deg)}}
+
+.z-sidebar,.z-dialogs,.z-workspace{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background-color var(--z-motion-ui) ease}
+.z-shell>.z-sidebar{animation:z-surface-in 300ms var(--z-motion-ease) both}
+.z-shell>.z-dialogs{animation:z-surface-in 340ms var(--z-motion-ease) 45ms both}
+.z-shell>.z-workspace{animation:z-surface-in 380ms var(--z-motion-ease) 90ms both}
+.z-shell[data-ui-section="profile"] .z-settings,.z-shell[data-ui-section="settings"] .z-settings,.z-shell[data-ui-section="discovery"] .z-discovery,.z-shell[data-ui-section="calls"] .z-call-lobby,.z-shell[data-ui-section="chats"] .z-message-view:not([hidden]){animation:z-surface-in var(--z-motion-enter) var(--z-motion-ease) both}
+.z-auth-card{animation:z-surface-in 420ms var(--z-motion-ease) both}
+
+button,.z-search,.z-composer-field,.z-chat-header,.z-contact,.z-group-pick,.z-profile-image-button,.z-group-profile-avatar,.z-photo-picker,.z-discovery-card,.z-message-image-button,.z-voice-player,.z-contact-photo-tile{transition:background-color var(--z-motion-fast) ease,border-color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease,color var(--z-motion-fast) ease,filter var(--z-motion-fast) ease,transform var(--z-motion-fast) var(--z-motion-ease),opacity var(--z-motion-fast) ease}
+button:active:not(:disabled){transform:scale(1.035);transition-duration:var(--z-motion-press)}
+.z-conversation:active:not(:disabled),.z-contact:active:not(:disabled),.z-group-pick:active:not(:disabled),.z-sidebar nav button:active:not(:disabled){transform:scale(1.012)}
+.z-sidebar nav button{transition:background-color var(--z-motion-ui) ease,color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease,transform var(--z-motion-fast) var(--z-motion-ease)}
+.z-sidebar nav button.is-active{transition:background-color var(--z-motion-ui) ease,color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease}
+.z-conversation.is-selected{transition:background var(--z-motion-ui) ease,border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease}
+.z-avatar{transition:box-shadow var(--z-motion-ui) ease,transform var(--z-motion-ui) var(--z-motion-ease)}
+input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background-color var(--z-motion-ui) ease}
+.z-composer-field:focus-within,.z-search:focus-within{transition:border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease,background var(--z-motion-ui) ease}
+.z-bubble-row:nth-last-child(2){animation:z-message-in 240ms var(--z-motion-ease) both}
+.z-chat-image-dialog[open]>img{animation:z-photo-in 220ms var(--z-motion-ease) both}
+.z-chat-image-dialog[open] .z-close-image{animation:z-surface-in 240ms var(--z-motion-ease) both}
+.z-contact-dialog[open],.z-call-dialog[open]{animation:z-dialog-in 260ms var(--z-motion-ease) both;transform-origin:center}
+.z-contact-dialog::backdrop,.z-call-dialog::backdrop,.z-chat-image-dialog::backdrop{animation:z-backdrop-in 200ms ease both}
+@keyframes z-backdrop-in{from{opacity:0}to{opacity:1}}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch:hover{box-shadow:0 0 0 4px #b7ff3918,0 0 20px #b7ff3928}
+.z-call-dock .z-icon:hover,.z-send:hover:not(:disabled){box-shadow:0 0 18px #b7ff3930}
+.z-connection[open] .z-connection-popover{animation:z-surface-in 180ms var(--z-motion-ease) both}
+.z-group-pick.is-picked{transition:background var(--z-motion-ui) ease,border-color var(--z-motion-ui) ease,box-shadow var(--z-motion-ui) ease}
+.z-unread{animation:z-pulse-ring 720ms ease-out 1}
+.z-loading>svg{animation:z-spin 1.4s linear infinite;transform-origin:center}
+@media(hover:hover) and (pointer:fine){
+  .primary:hover:not(:disabled),.secondary:hover:not(:disabled),.z-send:hover:not(:disabled),.z-icon:hover:not(:disabled),.z-collapse:hover:not(:disabled){transform:translateY(-1px)}
+  .z-sidebar nav button:hover{transform:translateX(2px)}
+  .z-conversation:hover,.z-group-pick:hover,.z-contact:hover{transform:translateY(-1px)}
+  .z-account:hover .z-avatar,.z-conversation:hover .z-avatar{transform:scale(1.035)}
+  .z-message-image-button:hover{transform:translateY(-1px)}
+  .z-discovery-card:hover{transform:translateY(-2px)}
+  .z-contact-photo-tile:hover{transform:translateY(-2px);border-color:#b7ff3980;box-shadow:0 0 14px #b7ff3920}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .z-unread{animation:none}
+}
+
+/* Liquid-glass accents: reserve the stronger blur for compact action buttons. */
+.z-list-top>div{gap:8px;align-items:center}
+.z-list-top>div>.z-icon{flex:0 0 42px;width:42px;height:42px}
+.secondary,.z-icon,.z-collapse,.z-attach-photo,.z-send,.z-call-dock .z-icon,.z-call-dock .z-end-call{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  border:1px solid #ffffff30;
+  background-image:linear-gradient(145deg,#ffffff2b 0%,#ffffff0c 42%,#ff14931b 100%);
+  -webkit-backdrop-filter:blur(24px) saturate(170%);
+  backdrop-filter:blur(24px) saturate(170%);
+  box-shadow:inset 0 1px 0 #ffffff50,inset 0 -1px 0 #ffffff10,0 5px 18px #0004;
+}
+.secondary{background-color:#211c238c;border-color:#ffffff25}
+.z-icon,.z-collapse,.z-attach-photo{background-color:#211c2370;border-color:#ffffff20}
+.z-send{background-color:#b7ff39cc;border-color:#e4ffae80;color:#101013;box-shadow:inset 0 1px 0 #ffffffad,inset 0 -2px 0 #648b2d30,0 6px 20px #b7ff3925}
+.z-call-dock .z-icon{background-color:#211c237d}
+.z-call-dock .z-end-call{background-color:#ff1744d9;border-color:#ff9aaa70}
+.primary{position:relative;isolation:isolate;border-color:#efffc16e;background-color:#b7ff39d9;background-image:linear-gradient(145deg,#e7ffc47a,#b7ff39aa 52%,#91d31eb8);-webkit-backdrop-filter:blur(22px) saturate(165%);backdrop-filter:blur(22px) saturate(165%);box-shadow:inset 0 1px 0 #ffffffa6,inset 0 -2px 0 #638d2b30,0 7px 22px #b7ff3924}
+.primary:hover:not(:disabled),.secondary:hover:not(:disabled),.z-icon:hover:not(:disabled),.z-collapse:hover:not(:disabled),.z-attach-photo:hover:not(:disabled),.z-send:hover:not(:disabled){border-color:#ffffff70;box-shadow:inset 0 1px 0 #ffffff75,0 0 18px #ff149326,0 8px 24px #0005}
+.primary:active:not(:disabled),.z-send:active:not(:disabled){box-shadow:inset 0 1px 0 #ffffff90,0 0 22px #b7ff3945}
+.secondary:active:not(:disabled),.z-icon:active:not(:disabled),.z-collapse:active:not(:disabled),.z-attach-photo:active:not(:disabled){background-image:linear-gradient(145deg,#ffffff3d 0%,#ffffff16 42%,#ff14932a 100%)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .secondary{background-color:#211c23f2}.z-icon,.z-collapse,.z-attach-photo{background-color:#211c23f2}.z-send,.primary{background-color:var(--z-lime)}
+}
+
+/* Birth-date selector: one shared surface instead of three competing cards. */
+.z-birth-date-field{grid-template-columns:minmax(0,1fr);align-items:start;gap:12px}
+.z-birth-date-field>div{display:grid;gap:8px;min-width:0}
+.z-birth-date-field>div>label{color:#e7dfe9;font-size:13px;font-weight:650;letter-spacing:.01em}
+.z-birth-date-field .z-birth-wheel{width:min(100%,430px);grid-template-columns:minmax(70px,.72fr) minmax(70px,.72fr) minmax(124px,1.2fr);gap:0;padding:5px;border:1px solid #ffffff1b;border-radius:21px;background:radial-gradient(ellipse at 12% 0%,#ff149317,transparent 54%),linear-gradient(155deg,#ffffff0b,#211a24e8 48%,#151116f5);box-shadow:inset 0 1px 0 #ffffff13,0 10px 28px #0003}
+.z-birth-wheel-column{grid-template-rows:16px 20px 44px 20px;min-height:112px;padding:7px 8px;border:0;border-radius:15px;background:transparent;box-shadow:none;perspective:320px}
+.z-birth-wheel-column:not(:last-child){border-right:1px solid #ffffff16;border-radius:0}
+.z-birth-wheel-column::before,.z-birth-wheel-column::after{left:16px;right:16px;background:linear-gradient(90deg,transparent,#ff149326 22%,#ffffff20 50%,#b7ff3924 78%,transparent)}
+.z-birth-wheel-column::before{top:39px}.z-birth-wheel-column::after{bottom:39px}
+.z-birth-wheel-label{color:#bdb4c0;font-size:9px;letter-spacing:.12em}
+.z-birth-wheel-neighbor{color:#c1b7c4;opacity:.32;filter:blur(.25px);font-variant-numeric:tabular-nums}
+.z-birth-wheel-column input{height:44px;font-size:23px;font-weight:700;letter-spacing:.055em;text-shadow:0 1px 14px #ffffff16}
+.z-birth-wheel-column:focus-within{border-color:transparent;border-radius:14px;background:linear-gradient(160deg,#ffffff0b,#ff14930a);box-shadow:inset 0 0 0 1px #b7ff3940}
+.z-birth-date-field>button{justify-self:end;min-height:46px;padding-inline:19px;border-radius:15px;white-space:nowrap}
+.z-birth-date-field>button:disabled{opacity:.42;filter:saturate(.5);box-shadow:inset 0 1px 0 #ffffff20}
+@media(max-width:560px){.z-birth-date-field{gap:10px}.z-birth-date-field .z-birth-wheel{grid-template-columns:minmax(62px,.72fr) minmax(62px,.72fr) minmax(108px,1.2fr);gap:0}.z-birth-wheel-column{min-height:108px;border-radius:14px}.z-birth-date-field>button{min-height:44px}}

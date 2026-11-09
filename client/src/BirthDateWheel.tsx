@@ -45,7 +45,7 @@ export function BirthDateWheel({ value, onChange, invalid = false, describedBy }
     animationTimers.current[part] = setTimeout(() => {
       column.classList.remove('is-spinning-up', 'is-spinning-down')
       animationTimers.current[part] = null
-    }, 260)
+    }, 420)
   }
 
   function step(part: BirthPart, direction: 1 | -1) {
