@@ -462,3 +462,14 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 @media(prefers-reduced-motion:reduce){
   .primary::before,.secondary::before,.z-icon::before,.z-collapse::before,.z-send::before,.z-attach-photo::before,.z-call-dock .z-end-call::before,.primary::after,.secondary::after,.z-icon::after,.z-collapse::after,.z-send::after,.z-attach-photo::after,.z-call-dock .z-end-call::after{transition:none}
 }
+
+/* Align the floating call action with the history control in the chat header. */
+.z-messages:not(.z-group-view)>.z-chat-header{padding-right:50px}
+.z-call-panel.is-idle:not(.no-peer){top:27px;right:16px}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch{display:grid;place-items:center;width:35px;height:35px;min-width:35px;min-height:35px;padding:0;flex:0 0 35px}
+.z-call-panel.is-idle:not(.no-peer) .z-call-launch svg{width:18px;height:18px}
+@media(max-width:720px){
+  .z-messages:not(.z-group-view)>.z-chat-header{padding-right:50px;gap:5px}
+  .z-call-panel.is-idle:not(.no-peer){top:24px;right:16px}
+  .z-call-panel.is-idle:not(.no-peer) .z-call-launch{width:28px;height:32px;min-width:28px;min-height:32px;flex-basis:28px}
+}
