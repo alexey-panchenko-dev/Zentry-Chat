@@ -1,6 +1,6 @@
 import { formatBirthDate, parseBirthDate, ageFromBirthDate, birthdayLabel, birthDatesSupported } from './birthdays'
 import { BirthDateWheel } from './BirthDateWheel'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, X, Heart } from 'lucide-react'
@@ -13,11 +13,11 @@ function useProfile() {
   return useQuery({ queryKey: ['profile'], queryFn: async () => (await api.get<{profile: Profile}>('/profile')).data.profile, staleTime: 60_000 })
 }
 
-export function ProfileEditor({ user }: { user: User }) {
+export function ProfileEditor({ user,onSaved }: { user: User;onSaved?:()=>void }) {
   const profile = useProfile()
   if (profile.isPending) return <p role="status">Загружаем профиль…</p>
   if (profile.isError) return <p className="notice">{errorText(profile.error)}</p>
-  return <>{(profile.data?.username||user.username)&&<UsernameEditor username={profile.data?.username||user.username||''}/>}<ProfileForm key={user.id+':'+(profile.data?.username||user.username)} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} /></>
+  return <>{(profile.data?.username||user.username)&&<UsernameEditor username={profile.data?.username||user.username||''}/>}<ProfileForm key={user.id+':'+(profile.data?.username||user.username)} profile={profile.data ?? {...user, age: null, bio: '', city: ''}} onSaved={onSaved} /></>
 }
 
 function UsernameEditor({username}:{username:string}){
@@ -37,7 +37,7 @@ function DiscoveryPhoto({ user }: { user: User }) {
       : <span className="z-discovery-initials" aria-hidden="true">{Array.from(user.name).slice(0,2).join('').toLocaleUpperCase('ru')}</span>}
   </div>
 }
-function ProfileForm({ profile }: {profile: Profile}) {
+function ProfileForm({ profile,onSaved }: {profile: Profile;onSaved?:()=>void}) {
   const cache = useQueryClient()
   const health=useQuery({queryKey:['registration-capabilities'],queryFn:async()=>(await api.get<unknown>('/health')).data,retry:false,staleTime:60_000,refetchInterval:query=>birthDatesSupported(query.state.data)?false:30_000})
   const birthDatesReady=birthDatesSupported(health.data)
@@ -55,6 +55,7 @@ function ProfileForm({ profile }: {profile: Profile}) {
       cache.setQueryData(['session'], (old: User) => ({...old, name: next.name}))
       void cache.invalidateQueries({queryKey: ['discovery']})
       void cache.invalidateQueries({queryKey: ['conversations']})
+      onSaved?.()
     },
   })
   function submit(event:FormEvent<HTMLFormElement>){
@@ -91,11 +92,15 @@ export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => 
   const [tab, setTab] = useState<'cards'|'likes'>('cards')
   const [expanded, setExpanded] = useState<Profile|null>(null)
   const [match, setMatch] = useState('')
+  const [swipe,setSwipe]=useState<'like'|'skip'|null>(null)
+  const swipeTimer=useRef<number|null>(null)
+  useEffect(()=>()=>{if(swipeTimer.current!==null)window.clearTimeout(swipeTimer.current)},[])
   const cards = useQuery({ queryKey: ['discovery','cards'], enabled: ready && tab==='cards', queryFn: async () => (await api.get<{profiles: Profile[]}>('/discovery')).data.profiles, refetchInterval: fallbackInterval })
   const likes = useQuery({ queryKey: ['discovery','likes'], enabled: ready && tab==='likes', queryFn: async () => (await api.get<{profiles: Profile[]}>('/discovery/likes')).data.profiles, refetchInterval: fallbackInterval })
   const vote = useMutation({
     mutationFn: async ({id,liked}: {id:string;liked:boolean}) => (await api.post<{matched:boolean;conversation_id:string}>('/discovery/votes',{user_id:id,liked})).data,
     onSuccess: (result, variables) => {
+      setSwipe(null)
       setExpanded(null)
       if(result.matched) setMatch('Вы стали друзьями! Переписка появилась в чатах.')
       // Remove the acted-on card immediately, including when its page is inactive.
@@ -104,12 +109,14 @@ export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => 
       void cache.invalidateQueries({queryKey:['conversations']})
       void cache.invalidateQueries({queryKey:['unread']})
     },
+    onError:()=>setSwipe(null),
   })
-  const actions = (person: Profile) => <div className="z-discovery-actions"><button className="z-skip" disabled={vote.isPending} aria-label="Не подходит" onClick={()=>vote.mutate({id:person.id,liked:false})}><X size={30}/></button><button className="z-like" disabled={vote.isPending} aria-label="Нравится" onClick={()=>vote.mutate({id:person.id,liked:true})}><Check size={30}/></button></div>
-  const card = (person: Profile) => <article className="z-discovery-card"><DiscoveryPhoto key={person.id} user={person}/><div className="z-discovery-details"><h2>{person.name}, {person.age}</h2>{person.city&&<p className="z-muted">{person.city}</p>}<p className="z-discovery-bio">{person.bio}</p></div>{actions(person)}</article>
+  const castVote=(person:Profile,liked:boolean)=>{if(vote.isPending||swipe||swipeTimer.current!==null)return;setSwipe(liked?'like':'skip');swipeTimer.current=window.setTimeout(()=>{swipeTimer.current=null;vote.mutate({id:person.id,liked})},420)}
+  const actions = (person: Profile) => <div className="z-discovery-actions"><button className="z-skip" disabled={vote.isPending||!!swipe} aria-label="Не подходит" onClick={()=>castVote(person,false)}><X size={30}/></button><button className="z-like" disabled={vote.isPending||!!swipe} aria-label="Нравится" onClick={()=>castVote(person,true)}><Check size={30}/></button></div>
+  const card = (person: Profile) => <article key={person.id} className={'z-discovery-card'+(swipe?' is-leaving-'+swipe:'')}><DiscoveryPhoto key={person.id} user={person}/><div className="z-discovery-details"><h2>{person.name}, {person.age}</h2>{person.city&&<p className="z-muted">{person.city}</p>}<p className="z-discovery-bio">{person.bio}</p></div>{actions(person)}</article>
   const active = tab==='cards'?cards:likes
   return <section className="z-discovery"><header className="z-discovery-header"><h1><Heart/> Знакомства</h1>
-    {ready&&<div className="z-discovery-tabs"><button className={tab==='cards'?'is-active':''} onClick={()=>{setTab('cards');setExpanded(null)}}>Люди</button><button className={tab==='likes'?'is-active':''} onClick={()=>{setTab('likes');setExpanded(null)}}>Входящие лайки</button></div>}
+    {ready&&<div className="z-discovery-tabs"><button className={tab==='cards'?'is-active':''} onClick={()=>{setTab('cards');setExpanded(null);setSwipe(null)}}>Люди</button><button className={tab==='likes'?'is-active':''} onClick={()=>{setTab('likes');setExpanded(null);setSwipe(null)}}>Входящие лайки</button></div>}
     </header><div className="z-discovery-content">
     {profile.data&&<DiscoveryCity key={profile.data.id} profile={profile.data}/>}
     {profile.isPending?<p role="status">Загружаем профиль…</p>:profile.isError?<p className="notice">{errorText(profile.error)}</p>:!ready?<div className="z-discovery-empty"><Heart size={32} aria-hidden="true"/><h2>Расскажи немного о себе</h2><p>Добавь дату рождения и описание,<br/>чтобы знакомиться.</p><button className="primary" onClick={onSettings}>Заполнить профиль</button></div>:<>

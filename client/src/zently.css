@@ -477,3 +477,33 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 /* Park the collapse control directly above the profile in both sidebar states. */
 .z-sidebar>.z-collapse{align-self:center;margin: auto 0 16px;flex:0 0 auto}
 .z-sidebar>.z-account{margin-top:0}
+.z-search .z-icon{width:38px;height:38px;min-width:38px;min-height:38px;flex:0 0 38px;border-radius:50%;padding:0}
+.z-image-viewer{position:relative;display:grid;place-items:center;width:100%;min-height:min(70dvh,680px);touch-action:pan-y}
+.z-image-viewer>img{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100dvh - 100px);object-fit:contain;margin:auto}
+.z-chat-image-dialog .z-photo-arrow{position:absolute;top:50%;z-index:2;display:grid;place-items:center;width:46px;height:46px;min-width:46px;min-height:46px;padding:0;border:1px solid #ffffff38;border-radius:50%;background:#211c23a8;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);color:#fff;box-shadow:inset 0 1px 0 #ffffff30,0 4px 18px #0007;transform:translateY(-50%)}
+.z-chat-image-dialog .z-photo-arrow:hover:not(:disabled){transform:translateY(-50%) scale(1.06);background:#3b2b3bcf;border-color:#ff91ceaa}
+.z-chat-image-dialog .z-photo-arrow:disabled{opacity:.36;cursor:default}
+.z-chat-image-dialog .z-photo-arrow.is-previous{left:12px}.z-chat-image-dialog .z-photo-arrow.is-next{right:12px}
+.z-photo-count{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:6px 12px;border:1px solid #ffffff2b;border-radius:999px;background:#211c23a8;backdrop-filter:blur(14px);color:white;font-size:12px;font-variant-numeric:tabular-nums}
+@media(max-width:480px){.z-chat-image-dialog .z-photo-arrow{width:40px;height:40px;min-width:40px;min-height:40px}.z-chat-image-dialog .z-photo-arrow.is-previous{left:6px}.z-chat-image-dialog .z-photo-arrow.is-next{right:6px}}
+.z-call-history{display:block;overflow:auto;text-align:left;padding:36px clamp(20px,5vw,64px)}
+.z-call-history-heading{display:flex;align-items:center;gap:14px;margin:0 0 28px}
+.z-call-history-heading>svg{color:var(--z-pink)}
+.z-call-history-heading h1{margin:0;color:var(--z-text);font-size:25px}
+.z-call-history-heading p{margin:6px 0 0;color:var(--z-muted);font-size:13px}
+.z-call-history-list{display:grid;gap:9px;max-width:760px}
+.z-call-history-row{display:flex;align-items:center;gap:13px;min-height:70px;padding:12px 16px;border:1px solid var(--z-line);border-radius:18px;background:linear-gradient(120deg,#261923b8,#171419cc);box-shadow:inset 0 1px 0 #ffffff08;transition:transform 220ms ease,border-color 220ms ease,background 220ms ease}
+.z-call-history-row:hover{transform:translateY(-2px);border-color:#ff149365;background:linear-gradient(120deg,#311729,#1a171d)}
+.z-call-history-icon{width:40px;height:40px;display:grid;place-items:center;flex:none;border:1px solid #b7ff3940;border-radius:50%;background:#b7ff3912;color:var(--z-lime)}
+.z-call-history-row.is-missed .z-call-history-icon{border-color:#ff149348;background:#ff149315;color:#ff6cb8}
+.z-call-history-person{display:grid;gap:5px;min-width:0;flex:1}
+.z-call-history-person strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--z-text);font-size:14px}
+.z-call-history-person span,.z-call-history-meta{color:var(--z-muted);font-size:11px}
+.z-call-history-meta{display:grid;gap:5px;justify-items:end;text-align:right;font-variant-numeric:tabular-nums}
+.z-call-history-meta time{white-space:nowrap}
+.z-call-history-empty{display:grid;justify-items:center;gap:12px;max-width:400px;margin:15vh auto 0;text-align:center;color:var(--z-muted)}
+.z-call-history-empty svg{color:var(--z-pink)}
+.z-call-history-empty strong{color:var(--z-text);font-size:17px}
+.z-call-history-empty span{font-size:13px;line-height:1.6}
+.z-call-history-error{max-width:520px}
+@media(max-width:520px){.z-call-history{padding:70px 14px 24px}.z-call-history-row{gap:10px;padding:11px}.z-call-history-icon{width:36px;height:36px}.z-call-history-person strong{font-size:13px}.z-call-history-person span,.z-call-history-meta{font-size:10px}}

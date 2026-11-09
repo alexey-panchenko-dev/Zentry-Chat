@@ -68,6 +68,15 @@ func (h *callHandlers) active(w http.ResponseWriter, r *http.Request, user auth.
 	writeJSON(w, 200, map[string]any{"calls": list})
 }
 
+func (h *callHandlers) history(w http.ResponseWriter, r *http.Request, user auth.User) {
+	list, err := h.store.History(r.Context(), user.ID)
+	if err != nil {
+		callFailure(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"calls": list})
+}
+
 func (h *callHandlers) transition(w http.ResponseWriter, r *http.Request, user auth.User) {
 	id, ok := callID(w, r)
 	if !ok {

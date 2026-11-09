@@ -1275,6 +1275,51 @@
         }
       }
     },
+    "/api/calls/history": {
+      "get": {
+        "tags": ["Calls"],
+        "operationId": "callHistory",
+        "summary": "История моих звонков",
+        "security": [{"sessionCookie": []}],
+        "description": "Последние 100 завершённых звонков с собеседником, временем и длительностью.",
+        "responses": {
+          "200": {
+            "description": "История звонков",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["calls"],
+                  "properties": {
+                    "calls": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "conversation_id", "peer_id", "peer_name", "direction", "status", "created_at", "duration_ms"],
+                        "properties": {
+                          "id": {"type": "string"},
+                          "conversation_id": {"type": "string"},
+                          "peer_id": {"type": "string"},
+                          "peer_name": {"type": "string"},
+                          "direction": {"type": "string", "enum": ["incoming", "outgoing"]},
+                          "status": {"type": "string", "enum": ["ended", "rejected", "cancelled", "expired"]},
+                          "created_at": {"type": "string", "format": "date-time"},
+                          "accepted_at": {"type": "string", "format": "date-time", "nullable": true},
+                          "ended_at": {"type": "string", "format": "date-time", "nullable": true},
+                          "duration_ms": {"type": "integer", "minimum": 0}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {"description": "Требуется вход", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "500": {"description": "Ошибка сервера", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
     "/api/calls": {
       "get": {
         "tags": [
