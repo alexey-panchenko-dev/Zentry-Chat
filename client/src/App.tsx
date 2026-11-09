@@ -65,6 +65,7 @@ export default function App() {
 }
 
 function Auth() {
+  const cache = useQueryClient()
   const [register, setRegister] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -78,7 +79,13 @@ function Auth() {
       if (register) await api.post('/auth/register', { name, email, password, birth_date:parseBirthDate(birthDate) })
       return (await api.post<{ user: User }>('/auth/login', { email, password })).data.user
     },
-    onSuccess: () => { window.location.replace(`${window.location.pathname}#chats`) },
+    onSuccess: async user => {
+      // Changing only the hash does not reload App or refresh its session query.
+      // Cancel an older /auth/me request before publishing the signed-in user.
+      await cache.cancelQueries({queryKey: ['session']})
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#chats`)
+      cache.setQueryData(['session'], user)
+    },
   })
   function submitAuth(event:FormEvent<HTMLFormElement>) {
     event.preventDefault()
