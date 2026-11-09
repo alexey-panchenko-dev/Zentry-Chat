@@ -480,6 +480,12 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 .z-search .z-icon{width:38px;height:38px;min-width:38px;min-height:38px;flex:0 0 38px;border-radius:50%;padding:0}
 .z-image-viewer{position:relative;display:grid;place-items:center;width:100%;min-height:min(70dvh,680px);touch-action:pan-y}
 .z-image-viewer>img{display:block;max-width:100%;width:auto;height:auto;max-height:calc(100dvh - 100px);object-fit:contain;margin:auto}
+.z-image-viewer>.z-gallery-photo{will-change:opacity,transform;animation-duration:360ms;animation-timing-function:cubic-bezier(.2,.72,.25,1);animation-fill-mode:both}
+.z-image-viewer>.z-gallery-photo--next{animation-name:z-gallery-photo-next}
+.z-image-viewer>.z-gallery-photo--previous{animation-name:z-gallery-photo-previous}
+@keyframes z-gallery-photo-next{from{opacity:0;transform:translateX(22px) scale(.985);filter:blur(3px)}to{opacity:1;transform:translateX(0) scale(1);filter:blur(0)}}
+@keyframes z-gallery-photo-previous{from{opacity:0;transform:translateX(-22px) scale(.985);filter:blur(3px)}to{opacity:1;transform:translateX(0) scale(1);filter:blur(0)}}
+@media(prefers-reduced-motion:reduce){.z-image-viewer>.z-gallery-photo{animation:none;will-change:auto}}
 .z-chat-image-dialog .z-photo-arrow{position:absolute;top:50%;z-index:2;display:grid;place-items:center;width:46px;height:46px;min-width:46px;min-height:46px;padding:0;border:1px solid #ffffff38;border-radius:50%;background:#211c23a8;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);color:#fff;box-shadow:inset 0 1px 0 #ffffff30,0 4px 18px #0007;transform:translateY(-50%)}
 .z-chat-image-dialog .z-photo-arrow:hover:not(:disabled){transform:translateY(-50%) scale(1.06);background:#3b2b3bcf;border-color:#ff91ceaa}
 .z-chat-image-dialog .z-photo-arrow:disabled{opacity:.36;cursor:default}
