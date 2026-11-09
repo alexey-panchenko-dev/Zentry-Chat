@@ -473,3 +473,7 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
   .z-call-panel.is-idle:not(.no-peer){top:24px;right:16px}
   .z-call-panel.is-idle:not(.no-peer) .z-call-launch{width:28px;height:32px;min-width:28px;min-height:32px;flex-basis:28px}
 }
+
+/* Park the collapse control directly above the profile in both sidebar states. */
+.z-sidebar>.z-collapse{align-self:center;margin: auto 0 16px;flex:0 0 auto}
+.z-sidebar>.z-account{margin-top:0}
