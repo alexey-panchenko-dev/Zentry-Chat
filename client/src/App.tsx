@@ -24,6 +24,8 @@ import { VoiceMessage } from '@/VoiceMessage'
 import { ProfilePhoto } from '@/ProfilePhoto'
 import { CallPanel } from '@/CallPanel'
 import { CallHistory } from '@/CallHistory'
+import { MessageActions, ConversationTools } from './MessageTools'
+import { FileComposer } from './FileComposer'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -146,7 +148,7 @@ function Chat({ user, onSessionViewChanged }: { user: User; onSessionViewChanged
   const [realtimeReady, setRealtimeReady] = useState(false)
   const controls=useConversationControls(selected?.id,realtimeReady)
   useEffect(() => watchConversations(user.id, event => {
-    if(event.reason==='group'||event.reason==='connected'){void cache.invalidateQueries({queryKey:['groups']});if(event.reason==='group'){void cache.invalidateQueries({queryKey:['group-messages']});return}}
+    if(event.reason==='group'||event.reason==='connected'){void cache.invalidateQueries({queryKey:['groups']});if(event.reason==='group'){void cache.invalidateQueries({queryKey:['group-messages']});void cache.invalidateQueries({queryKey:['group-message-reactions']});void cache.invalidateQueries({queryKey:['group-pins']});return}}
     if(event.reason==='discovery') {
       void cache.invalidateQueries({queryKey:['discovery']})
       return
@@ -249,6 +251,11 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
       setLive(old=>({...old,[message.id]:message}))
       void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})
     },
+    'message.feature.updated': () => {
+      void cache.invalidateQueries({queryKey:['messages',conversation.id]})
+      void cache.invalidateQueries({queryKey:['message-reactions']})
+      void cache.invalidateQueries({queryKey:['pinned-messages',conversation.id]})
+    },
    }, ready => {
     if(ready) {
       void cache.invalidateQueries({queryKey:['messages',conversation.id]})
@@ -256,16 +263,17 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
     }
   }), [cache,conversation.id])
 
+  const [replyTo,setReplyTo]=useState<Message|null>(null)
   const send = useMutation({
-    mutationFn: async (text: string) => {
-      if (pending.current?.body !== text) pending.current = { body: text, id: crypto.randomUUID() }
+    mutationFn: async (input: {text:string;replyTo?:Message|null}) => {
+      if (pending.current?.body !== input.text) pending.current = { body: input.text, id: crypto.randomUUID() }
       return (await api.post<{ message: Message; realtime: string }>(`/conversations/${conversation.id}/messages`, {
-        body: text, client_message_id: pending.current.id,
+        body: input.text, client_message_id: pending.current.id,reply_to_id:input.replyTo?.id,
       })).data
     },
     onSuccess: (result) => {
       setLive((old) => ({ ...old, [result.message.id]: result.message }))
-      setBody(''); pending.current = null
+      setBody('');setReplyTo(null); pending.current = null
        void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})
     },
   })
@@ -283,19 +291,26 @@ function Messages({ conversation, user, visible, callActive, realtimeReady, onPr
   const latest = messages.at(-1)?.id
   useReadReceipt(conversation.id, latest, visible && !callActive && !profileOpen && !imageViewing, bottom)
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }, [latest])
-  function submit(event: FormEvent) { event.preventDefault(); if (body.trim() && !send.isPending && !contactDisabled) send.mutate(body.trim()) }
+  function submit(event: FormEvent) { event.preventDefault(); if (body.trim() && !send.isPending && !contactDisabled) send.mutate({text:body.trim(),replyTo}) }
+  function jumpToMessage(id:string){document.querySelector(`[data-message-id="${id}"]`)?.scrollIntoView({behavior:'smooth',block:'center'})}
 
   return <section className="z-messages">
     {profileOpen&&visible&&<ContactProfile conversation={conversation} onClose={()=>setProfileOpen(false)} onCall={onProfileCall} callBusy={callActive} controls={controls} onRemoved={onRemoved}/>}
-    <header className="z-chat-header"><button type="button" className="z-header-profile" aria-label={'Открыть профиль: '+conversation.participant.name} onClick={()=>setProfileOpen(true)}><Avatar user={conversation.participant}/><span><strong>{peerProfile.data?.display_name||conversation.display_name||conversation.participant.name}</strong><small>{peerProfile.isPending?'Проверяем статус…':peerProfile.isError||typeof peerProfile.data?.online!=='boolean'?'Статус недоступен':peerProfile.data.online?'В сети':'Не в сети'}</small></span></button><button className="z-icon z-history" title="Обновить историю" aria-label="Обновить историю" onClick={()=>{void history.refetch();void peerProfile.refetch()}} disabled={history.isFetching}><RefreshCw size={18}/></button></header>
+    <header className="z-chat-header"><button type="button" className="z-header-profile" aria-label={'Открыть профиль: '+conversation.participant.name} onClick={()=>setProfileOpen(true)}><Avatar user={conversation.participant}/><span><strong>{peerProfile.data?.display_name||conversation.display_name||conversation.participant.name}</strong><small>{peerProfile.isPending?'Проверяем статус…':peerProfile.isError||typeof peerProfile.data?.online!=='boolean'?'Статус недоступен':peerProfile.data.online?'В сети':'Не в сети'}</small></span></button><ConversationTools conversationID={conversation.id} onJump={jumpToMessage}/><button className="z-icon z-history" title="Обновить историю" aria-label="Обновить историю" onClick={()=>{void history.refetch();void peerProfile.refetch()}} disabled={history.isFetching}><RefreshCw size={18}/></button></header>
     <div className="z-message-scroll">
       {history.hasNextPage&&<button className="secondary z-older" disabled={history.isFetchingNextPage} onClick={()=>void history.fetchNextPage()}>Более ранние сообщения</button>}
       {history.isPending&&<p className="z-empty-copy" role="status">Загружаем историю…</p>}{history.isError&&<p className="notice">{errorText(history.error)}</p>}
       {!history.isPending&&!history.isError&&messages.length===0&&<div className="z-empty-copy"><p>Начни разговор</p><small>Напиши первое сообщение.</small></div>}
-      {messages.map(message=><div key={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className={'z-bubble'+(message.kind==='image'?' is-image-bubble':'')}><>{message.kind==='image'?<><ImageMessage url={message.image_url} gallery={photoGallery} index={photoMessages.findIndex(photo=>photo.id===message.id)} onOpenChange={setImageViewing}/>{message.body.trim()&&<p className="z-image-caption">{message.body}</p>}</>:message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:<p>{message.body}</p>}</><div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.sender_id===user.id&&(messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='read'?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='delivered'?<CheckCheck size={16} aria-label="Доставлено" className="z-dark-check"/>:<Check size={16} aria-label="Отправлено" className="z-dark-check"/>)}</div></div></div>)}<div ref={bottom} style={{minHeight:1}}/>
+      {messages.map(message=><div key={message.id} data-message-id={message.id} className={'z-bubble-row'+(message.kind==='system'?' is-system':message.sender_id===user.id?' is-own':'')}><div className={'z-bubble'+(message.kind==='image'?' is-image-bubble':'')} onDoubleClick={()=>{if(message.kind!=='system')void api.post(`/messages/${message.id}/reactions`,{emoji:'❤️'}).then(()=>cache.invalidateQueries({queryKey:['message-reactions',message.id]}))}}>
+        {message.reply_to_id&&<button type="button" className="z-reply-quote" onClick={()=>jumpToMessage(message.reply_to_id!)}><span>{message.reply_sender_name&&<strong>{message.reply_sender_name}: </strong>}{message.reply_body||'Сообщение удалено'}</span></button>}
+        {message.forwarded_from_id&&<small className="z-forward-label">Переслано</small>}
+        {message.kind==='image'?<><ImageMessage url={message.image_url} gallery={photoGallery} index={photoMessages.findIndex(photo=>photo.id===message.id)} onOpenChange={setImageViewing}/>{message.body.trim()&&<p className="z-image-caption">{message.body}</p>}</>:message.kind==='voice'&&message.audio_url?.startsWith('/api/messages/')?<VoiceMessage url={message.audio_url} duration={message.duration_ms}/>:message.kind==='file'&&message.attachment_mime?.startsWith('video/')?<video className="z-video-attachment" controls preload="metadata" src={message.attachment_url||`/api/messages/${message.id}/file`}/>:message.kind==='file'?<a className="z-file-message" href={message.attachment_url||`/api/messages/${message.id}/file`}><span>{message.attachment_name||'Вложение'}</span><small>Скачать файл · {message.attachment_mime||'файл'}</small></a>:<p>{message.body}</p>}
+        <div className="z-message-meta"><time>{new Date(message.created_at).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}</time>{message.edited_at&&<span>Изменено</span>}{message.sender_id===user.id&&(messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='read'?<CheckCheck size={16} aria-label="Прочитано" className="z-read-check"/>:messageStatus(message.id,readState.data?.peer_last_delivered_id,readState.data?.peer_last_read_id)==='delivered'?<CheckCheck size={16} aria-label="Доставлено" className="z-dark-check"/>:<Check size={16} aria-label="Отправлено" className="z-dark-check"/>)}</div>
+        <MessageActions message={message} userID={user.id} conversationID={conversation.id} onReply={setReplyTo} onChanged={()=>{void cache.invalidateQueries({queryKey:['messages',conversation.id]});void cache.invalidateQueries({queryKey:['pinned-messages',conversation.id]})}}/>
+      </div></div>)}<div ref={bottom} style={{minHeight:1}}/>
     </div>
     <form noValidate className="z-composer-region" onSubmit={submit}>{controls.state&&blockNotice(controls.state)&&<p className="notice" role="status">{blockNotice(controls.state)}</p>}{controls.loading&&<p role="status">Проверяем переписку…</p>}{controls.error&&<p className="notice" role="alert">Не удалось проверить переписку. <button type="button" className="secondary" onClick={()=>void controls.refetch()}>Повторить</button></p>}{send.isError&&<p className="notice" role="alert">{errorText(send.error)} Повторите отправку: прежний идентификатор сохранён.</p>}
-      <div className="z-composer"><div className="z-composer-field"><textarea ref={messageInput} className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} readOnly={send.isPending} disabled={contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
+      {replyTo&&<div className="z-reply-composer"><span><small>Ответ на сообщение</small>{replyTo.body||'Вложение'}</span><button type="button" aria-label="Отменить ответ" onClick={()=>setReplyTo(null)}>×</button></div>}<div className="z-composer"><div className="z-composer-field"><textarea ref={messageInput} className="resize-none" aria-label="Сообщение" placeholder="Сообщение…" rows={1} maxLength={1000} value={body} readOnly={send.isPending} disabled={contactDisabled} onChange={e=>setBody(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.form?.requestSubmit()}}}/></div><MediaAvailability feature="chat_images"><ImageComposer conversationID={conversation.id} disabled={contactDisabled||!visible||voiceActive} onActiveChange={setImageActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><MediaAvailability feature="voice"><VoiceComposer conversationID={conversation.id} disabled={callActive||!visible||contactDisabled||imageActive} onActiveChange={setVoiceActive} onSent={result=>{setLive(old=>({...old,[result.message.id]:result.message}));void cache.invalidateQueries({queryKey:['contact-profile',conversation.id]})}}/></MediaAvailability><FileComposer conversationID={conversation.id} disabled={contactDisabled||!visible} onSent={message=>{setLive(old=>({...old,[message.id]:message}));void cache.invalidateQueries({queryKey:['messages',conversation.id]})}}/><button className="z-send z-text-send" aria-label="Отправить сообщение" disabled={!body.trim()||send.isPending||contactDisabled}><Send size={23}/></button></div>
     </form>
   </section>
 }

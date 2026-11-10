@@ -19,13 +19,22 @@ export type Message = {
   id: string
   conversation_id: string
   sender_id: string
-  kind?: 'text' | 'voice' | 'system' | 'image'
+  kind?: 'text' | 'voice' | 'system' | 'image' | 'file'
   image_url?: string
   audio_url?: string
   duration_ms?: number
   body: string
   created_at: string
+  reply_to_id?:string
+  reply_body?:string
+  reply_sender_name?:string
+  forwarded_from_id?:string
+  edited_at?:string
+  attachment_url?:string
+  attachment_name?:string
+  attachment_mime?:string
 }
+export type MessageReaction={emoji:string;count:number;mine:boolean}
 export type MessagePage = { messages: Message[]; next_cursor: string }
 
 export function errorText(error: unknown): string {

@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"errors"
+	"fmt"
 	"newsChat/api/internal/contactguard"
 	"time"
 
@@ -35,6 +36,14 @@ type Message struct {
 	ImageURL        string    `json:"image_url,omitempty"`
 	Kind            string    `json:"kind,omitempty"`
 	AudioURL        string    `json:"audio_url,omitempty"`
+	AttachmentURL   string    `json:"attachment_url,omitempty"`
+	AttachmentName  string    `json:"attachment_name,omitempty"`
+	AttachmentMIME  string    `json:"attachment_mime,omitempty"`
+	ReplyToID       string    `json:"reply_to_id,omitempty"`
+	ReplyBody       string    `json:"reply_body,omitempty"`
+	ReplySenderName string    `json:"reply_sender_name,omitempty"`
+	ForwardedFromID string    `json:"forwarded_from_id,omitempty"`
+	EditedAt        *time.Time `json:"edited_at,omitempty"`
 	DurationMS      int       `json:"duration_ms,omitempty"`
 	ID              string    `json:"id"`
 	ConversationID  string    `json:"conversation_id"`
@@ -143,8 +152,8 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT id::text,conversation_id::text,COALESCE(sender_id::text,''),client_message_id::text,body,created_at,CASE WHEN kind<>'text' THEN kind ELSE '' END,COALESCE(duration_ms,0)
-        FROM messages WHERE conversation_id=$1 AND id>(SELECT cleared_through FROM conversation_members WHERE conversation_id=$1 AND user_id=$4) AND ($2::bigint=0 OR id<$2) ORDER BY id DESC LIMIT $3`, conversationID, before, limit, userID)
+	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.conversation_id::text,COALESCE(m.sender_id::text,''),m.client_message_id::text,m.body,m.created_at,CASE WHEN m.kind<>'text' THEN m.kind ELSE '' END,COALESCE(m.duration_ms,0),COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,''),COALESCE(m.forwarded_from_id::text,''),m.edited_at,COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,'')
+	    FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$4 LEFT JOIN messages parent ON parent.id=m.reply_to_id AND parent.conversation_id=m.conversation_id AND parent.id>cm.cleared_through LEFT JOIN users reply_author ON reply_author.id=parent.sender_id WHERE m.conversation_id=$1 AND m.id>cm.cleared_through AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, conversationID, before, limit, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +161,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	result := make([]Message, 0)
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.ForwardedFromID,&m.EditedAt,&m.AttachmentName,&m.AttachmentMIME); err != nil {
 			return nil, err
 		}
 		if m.Kind == "voice" {
@@ -161,12 +170,17 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 		if m.Kind == "image" {
 			m.ImageURL = "/api/messages/" + m.ID + "/image"
 		}
+		if m.Kind == "file" { m.AttachmentURL = "/api/messages/" + m.ID + "/file" }
 		result = append(result, m)
 	}
 	return result, rows.Err()
 }
 
 func (s *Store) Send(ctx context.Context, conversationID, userID, clientID, body string) (Message, bool, error) {
+	return s.SendWithReply(ctx,conversationID,userID,clientID,body,"")
+}
+
+func (s *Store) SendWithReply(ctx context.Context, conversationID, userID, clientID, body, replyID string) (Message, bool, error) {
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return Message{}, false, err
 	}
@@ -178,21 +192,29 @@ func (s *Store) Send(ctx context.Context, conversationID, userID, clientID, body
 	if err = lockSending(ctx, tx, conversationID, userID); err != nil {
 		return Message{}, false, err
 	}
+	var reply any
+	var replyBody, replySender string
+	if replyID != "" {
+		var replyInt int64
+		if _,err=fmt.Sscan(replyID,&replyInt);err!=nil||replyInt<1{return Message{},false,ErrNotFound}
+		err=tx.QueryRow(ctx,`SELECT m.body,COALESCE(u.name,'') FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$3 LEFT JOIN users u ON u.id=m.sender_id WHERE m.id=$2 AND m.conversation_id=$1 AND m.id>cm.cleared_through`,conversationID,replyInt,userID).Scan(&replyBody,&replySender);if errors.Is(err,pgx.ErrNoRows){return Message{},false,ErrNotFound};if err!=nil{return Message{},false,err};reply=replyInt
+	}
 	var m Message
-	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body)
-        VALUES($1,$2,$3,$4) ON CONFLICT(sender_id,client_message_id) DO NOTHING
-        RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at`, conversationID, userID, clientID, body).
-		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
+	err = tx.QueryRow(ctx, `INSERT INTO messages(conversation_id,sender_id,client_message_id,body,reply_to_id)
+	    VALUES($1,$2,$3,$4,$5) ON CONFLICT(sender_id,client_message_id) DO NOTHING
+	    RETURNING id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at,COALESCE(reply_to_id::text,'')`, conversationID, userID, clientID, body,reply).
+		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt,&m.ReplyToID)
 	if err == nil {
+		m.ReplyBody=replyBody;m.ReplySenderName=replySender
 		return m, true, tx.Commit(ctx)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return m, false, err
 	}
-	err = tx.QueryRow(ctx, `SELECT id::text,conversation_id::text,sender_id::text,client_message_id::text,body,created_at
-        FROM messages WHERE sender_id=$1 AND client_message_id=$2`, userID, clientID).
-		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt)
-	if err == nil && (m.ConversationID != conversationID || m.Body != body) {
+	err = tx.QueryRow(ctx, `SELECT m.id::text,m.conversation_id::text,m.sender_id::text,m.client_message_id::text,m.body,m.created_at,COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,'')
+        FROM messages m LEFT JOIN messages parent ON parent.id=m.reply_to_id LEFT JOIN users reply_author ON reply_author.id=parent.sender_id WHERE m.sender_id=$1 AND m.client_message_id=$2`, userID, clientID).
+		Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName)
+	if err == nil && (m.ConversationID != conversationID || m.Body != body || m.ReplyToID!=replyID) {
 		return Message{}, false, ErrConflict
 	}
 	if err != nil {

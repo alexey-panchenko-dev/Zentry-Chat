@@ -109,6 +109,7 @@ func (h *chatHandlers) sendGroupMessage(w http.ResponseWriter, r *http.Request, 
 	var in struct {
 		ClientMessageID string `json:"client_message_id"`
 		Body            string `json:"body"`
+		ReplyToID       string `json:"reply_to_id"`
 	}
 	if !readAuthJSON(w, r, &in) {
 		return
@@ -119,7 +120,17 @@ func (h *chatHandlers) sendGroupMessage(w http.ResponseWriter, r *http.Request, 
 		writeJSON(w, 400, map[string]string{"error": "invalid_message"})
 		return
 	}
-	m, created, members, e := h.store.SendGroupMessage(r.Context(), id, u.ID, in.ClientMessageID, in.Body)
+	var m chat.GroupMessage
+	var created bool
+	var members []string
+	var e error
+	if in.ReplyToID!="" {
+		replyID,parseErr:=strconv.ParseInt(in.ReplyToID,10,64)
+		if parseErr!=nil||replyID<1{writeJSON(w,400,map[string]string{"error":"invalid_reply"});return}
+		m,created,members,e=h.store.SendGroupReply(r.Context(),id,u.ID,in.ClientMessageID,in.Body,strconv.FormatInt(replyID,10))
+	} else {
+		m, created, members, e = h.store.SendGroupMessage(r.Context(), id, u.ID, in.ClientMessageID, in.Body)
+	}
 	if e != nil {
 		chatFailure(w, e)
 		return
