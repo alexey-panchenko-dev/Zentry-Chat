@@ -592,3 +592,49 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 .z-reaction-list>button{animation:z-reaction-pop 220ms var(--z-motion-ease) both}
 @keyframes z-reaction-pop{0%{opacity:0;transform:scale(.72)}70%{transform:scale(1.08)}100%{opacity:1;transform:scale(1)}}
 @media(prefers-reduced-motion:reduce){.z-forward-picker,.z-reaction-list>button{animation:none}}
+
+.z-phone-control option{background:#211b26;color:#f5f3f7}
+.z-composer-field textarea{overflow-y:auto;max-height:132px;min-height:36px}
+.z-bubble-row{touch-action:pan-y}
+
+.z-chat-row{position:relative;touch-action:pan-y}
+.z-chat-row>.z-conversation{width:100%;padding-right:50px}
+.z-chat-row-menu{position:absolute;right:4px;top:10px;min-width:44px;min-height:44px}
+.z-chat-quick-actions,.z-dialog-filters,.z-mobile-hub{display:flex;flex-wrap:wrap;gap:6px;padding:5px}
+.z-chat-quick-actions button,.z-dialog-filters button,.z-mobile-hub button{padding:6px 9px;border:1px solid #ffffff23;border-radius:12px;min-height:44px;background:#201823}
+.z-dialog-filters button[aria-pressed=true]{color:#b7ff39;border-color:#b7ff3960}
+.z-favorite-item,.z-message-notice{display:flex;align-items:center;gap:8px;padding:8px;background:#251b27;border:1px solid #ff149343;border-radius:14px}
+.z-favorite-item>button:first-child,.z-message-notice>button:first-child{display:grid;text-align:left;gap:4px;flex:1;min-width:0;padding:8px}
+.z-favorite-item span,.z-message-notice span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.z-favorite-item+.z-favorite-item{margin-top:8px}
+.z-message-notice{position:fixed;z-index:10;bottom:max(14px,env(safe-area-inset-bottom));right:14px;width:min(340px,calc(100% - 28px));box-shadow:0 12px 36px #0009}
+.z-appearance select{background:#211b26;color:#f5f3f7;color-scheme:dark;padding:8px;border:1px solid #ffffff30;border-radius:8px}
+.z-shortcuts{margin:12px 0;padding-left:20px}
+.z-media-center{max-height:min(55vh,440px);overflow:auto;overscroll-behavior:contain}
+.z-media-entry{display:grid;gap:5px;padding:6px 2px}
+.z-media-entry a{overflow-wrap:anywhere}
+.z-media-entry .z-image-message{width:min(160px,100%)}
+.z-media-jump{justify-self:start;text-decoration:underline;min-height:36px}
+.z-shell[data-text=large] .z-bubble>p{font-size:1.12rem}
+.z-shell[data-density=compact] .z-message-scroll{gap:7px}
+.z-shell[data-density=compact] .z-bubble{padding-block:7px}
+.z-shell[data-backdrop=graphite] .z-message-scroll{background:#151519}
+.z-shell[data-backdrop=plum] .z-message-scroll{background:linear-gradient(155deg,#291728,#141018)}
+.z-shell[data-motion=reduced] *, .z-shell[data-motion=reduced] *::before,.z-shell[data-motion=reduced] *::after{animation-duration:1ms!important;transition-duration:1ms!important;scroll-behavior:auto!important}
+.z-mobile-hub{display:none}
+@media(max-width:720px){
+ .z-shell.has-mobile-chat{height:var(--z-viewport-height,100dvh);min-height:0}
+ .z-mobile-hub{display:flex}
+ .z-mobile-hub span{align-self:center;font-size:.8rem}
+ .z-chat-quick-actions button,.z-favorite-item button,.z-media-jump,.z-message-menu summary{min-height:44px}
+ .z-composer .z-icon,.z-composer .z-send{min-width:44px;min-height:44px}
+ .z-composer .z-file-queue{width:min(330px,calc(100vw - 24px));max-height:min(230px,38vh);overflow:auto}
+}
+
+.z-conversation-list{display:flex;flex-direction:column}
+.z-chat-row{flex-shrink:0}
+.z-chat-row[data-pinned=true]{order:-1}
+
+/* Keep message actions inside the scrolling history, including the first message. */
+.z-message-menu-items{position:static;margin-top:6px;min-width:min(168px,58vw);box-shadow:none}
+.z-bubble-row:has(.z-message-menu[open]) .z-bubble{max-width:100%}

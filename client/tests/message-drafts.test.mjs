@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {messageDraftKey,readMessageDraft,writeMessageDraft} from '../src/message-drafts.ts'
+import {messageDraftKey,readMessageDraft,writeMessageDraft,replaceDraftRecord} from '../src/message-drafts.ts'
 
 function memoryStorage(){
   const values=new Map()
@@ -30,4 +30,15 @@ test('draft persistence respects the message length limit',()=>{
   const storage=memoryStorage()
   writeMessageDraft(storage,'user','chat','x'.repeat(1200))
   assert.equal(readMessageDraft(storage,'user','chat').length,1000)
+})
+
+test('late confirmation cannot erase a newer draft or its reply reference',()=>{
+  const storage=memoryStorage()
+  const key='draft'
+  const old=JSON.stringify({body:'sent',replyID:'31'})
+  const newer=JSON.stringify({body:'newer',replyID:'32'})
+  assert.equal(replaceDraftRecord(storage,key,null,old),true)
+  assert.equal(replaceDraftRecord(storage,key,old,newer),true)
+  assert.equal(replaceDraftRecord(storage,key,old,''),false)
+  assert.equal(storage.getItem(key),newer)
 })

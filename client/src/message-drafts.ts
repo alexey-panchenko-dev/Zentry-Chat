@@ -21,3 +21,9 @@ export function writeMessageDraft(storage: DraftStorage, userID: string, convers
     // Storage can be unavailable in private browsing or when the device is full.
   }
 }
+
+export function replaceDraftRecord(storage: DraftStorage, key: string, expected: string | null, next: string) {
+  if (storage.getItem(key) !== expected) return false
+  storage.setItem(key, next)
+  return true
+}

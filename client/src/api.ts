@@ -12,7 +12,7 @@ export function visibleUsername(user: User): string {
   const handle = user.username && !/^u_[0-9a-f]{32}$/.test(user.username) ? user.username : user.name
   return '@' + handle.charAt(0).toUpperCase() + handle.slice(1)
 }
-export type Conversation = { id: string; participant: User; display_name?:string; last_message?:string; unread_count?: number }
+export type Conversation = { id: string; participant: User; display_name?:string; last_message?:string; last_message_id?:string; last_message_incoming?:boolean; first_unread_id?:string; unread_count?: number }
 export type Profile = User & { age: number | null; birth_date?:string; bio: string; city: string }
 export type ReadState = { unread_count: number; last_message_id: string; peer_last_read_id: string; peer_last_delivered_id?:string }
 export type Message = {
@@ -25,6 +25,7 @@ export type Message = {
   duration_ms?: number
   body: string
   created_at: string
+  reactions?:MessageReaction[]|null
   reply_to_id?:string
   reply_body?:string
   reply_sender_name?:string
