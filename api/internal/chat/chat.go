@@ -23,6 +23,9 @@ type PublicUser struct {
 }
 
 type Conversation struct {
+	LastMessageID string `json:"last_message_id,omitempty"`
+	FirstUnreadID string `json:"first_unread_id,omitempty"`
+	LastMessageIncoming bool `json:"last_message_incoming,omitempty"`
 	LastMessage string     `json:"last_message"`
 	ID          string     `json:"id"`
 	Participant PublicUser `json:"participant"`
@@ -33,6 +36,7 @@ type Conversation struct {
 }
 
 type Message struct {
+	Reactions []ReactionCount `json:"reactions"`
 	ImageURL        string    `json:"image_url,omitempty"`
 	Kind            string    `json:"kind,omitempty"`
 	AudioURL        string    `json:"audio_url,omitempty"`
@@ -115,10 +119,14 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),COALESCE((SELECT CASE WHEN msg.sender_id=$1 THEN 'Вы: ' ELSE '' END || CASE msg.kind WHEN 'image' THEN 'Фото' WHEN 'voice' THEN 'Голосовое сообщение' ELSE left(msg.body,160) END FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>m.cleared_through ORDER BY msg.id DESC LIMIT 1),''),(SELECT count(*) FROM messages msg WHERE msg.conversation_id=c.id AND msg.id>GREATEST(m.last_read_id,m.cleared_through) AND (msg.sender_id IS NULL OR msg.sender_id<>$1))
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),COALESCE(CASE recent.kind WHEN 'image' THEN 'Фото' WHEN 'voice' THEN 'Голосовое сообщение' WHEN 'file' THEN COALESCE(recent.attachment_name,'Файл') ELSE left(recent.body,160) END,''),COALESCE(recent.id::text,''),COALESCE(recent.sender_id<>$1,false), unread.total, COALESCE(unread.first_id::text,'')
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
 		LEFT JOIN contact_aliases a ON a.owner_id=$1 AND a.peer_id=u.id
+        LEFT JOIN LATERAL (SELECT id, sender_id, kind, body, attachment_name FROM messages
+            WHERE conversation_id=c.id AND id>m.cleared_through ORDER BY id DESC LIMIT 1) recent ON true
+        LEFT JOIN LATERAL (SELECT count(*) total, min(id) first_id FROM messages
+            WHERE conversation_id=c.id AND id>GREATEST(m.last_read_id,m.cleared_through) AND sender_id IS DISTINCT FROM m.user_id) unread ON true
         WHERE m.user_id=$1 AND NOT m.hidden AND ($2::bigint=0 OR c.position<$2)
         ORDER BY c.position DESC LIMIT $3`, userID, before, limit)
 	if err != nil {
@@ -128,7 +136,7 @@ func (s *Store) Conversations(ctx context.Context, userID string, before int64, 
 	result := make([]Conversation, 0)
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.LastMessage, &c.UnreadCount); err != nil {
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.LastMessage, &c.LastMessageID, &c.LastMessageIncoming, &c.UnreadCount, &c.FirstUnreadID); err != nil {
 			return nil, err
 		}
 		result = append(result, c)
@@ -152,7 +160,10 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.conversation_id::text,COALESCE(m.sender_id::text,''),m.client_message_id::text,m.body,m.created_at,CASE WHEN m.kind<>'text' THEN m.kind ELSE '' END,COALESCE(m.duration_ms,0),COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,''),COALESCE(m.forwarded_from_id::text,''),m.edited_at,COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,'')
+	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.conversation_id::text,COALESCE(m.sender_id::text,''),m.client_message_id::text,m.body,m.created_at,CASE WHEN m.kind<>'text' THEN m.kind ELSE '' END,COALESCE(m.duration_ms,0),COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,''),COALESCE(m.forwarded_from_id::text,''),m.edited_at,COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,''),
+        COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.emoji) FROM (
+            SELECT emoji,count(*)::int count,bool_or(user_id=$4) mine FROM message_reactions WHERE message_id=m.id GROUP BY emoji
+        ) t),'[]'::jsonb)
 	    FROM messages m JOIN conversation_members cm ON cm.conversation_id=m.conversation_id AND cm.user_id=$4 LEFT JOIN messages parent ON parent.id=m.reply_to_id AND parent.conversation_id=m.conversation_id AND parent.id>cm.cleared_through LEFT JOIN users reply_author ON reply_author.id=parent.sender_id WHERE m.conversation_id=$1 AND m.id>cm.cleared_through AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, conversationID, before, limit, userID)
 	if err != nil {
 		return nil, err
@@ -161,7 +172,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	result := make([]Message, 0)
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.ForwardedFromID,&m.EditedAt,&m.AttachmentName,&m.AttachmentMIME); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.ForwardedFromID,&m.EditedAt,&m.AttachmentName,&m.AttachmentMIME,&m.Reactions); err != nil {
 			return nil, err
 		}
 		if m.Kind == "voice" {

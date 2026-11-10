@@ -20,6 +20,8 @@ type Group struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 type GroupMessage struct {
+	Reactions []ReactionCount `json:"reactions"`
+	AttachmentSize int `json:"attachment_size,omitempty"`
 	ID              string    `json:"id"`
 	GroupID         string    `json:"group_id"`
 	SenderID        string    `json:"sender_id"`
@@ -131,7 +133,10 @@ func (s *Store) GroupMessages(ctx context.Context, id, user string, before int64
 	if _, err := s.Group(ctx, id, user); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.group_id::text,m.sender_id::text,u.name,m.client_message_id::text,m.body,m.created_at,m.kind,COALESCE(m.reply_to_id::text,''),COALESCE(r.body,''),COALESCE(ru.name,''),m.edited_at,COALESCE(m.forwarded_from_id::text,''),COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,'') FROM group_messages m JOIN group_members gm ON gm.group_id=m.group_id AND gm.user_id=$4 JOIN users u ON u.id=m.sender_id LEFT JOIN group_messages r ON r.id=m.reply_to_id AND r.group_id=m.group_id LEFT JOIN users ru ON ru.id=r.sender_id WHERE m.group_id=$1 AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, id, before, limit, user)
+	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.group_id::text,m.sender_id::text,u.name,m.client_message_id::text,m.body,m.created_at,m.kind,COALESCE(m.reply_to_id::text,''),COALESCE(r.body,''),COALESCE(ru.name,''),m.edited_at,COALESCE(m.forwarded_from_id::text,''),COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,''),
+        COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.emoji) FROM (
+            SELECT emoji,count(*)::int count,bool_or(user_id=$4) mine FROM group_message_reactions WHERE message_id=m.id GROUP BY emoji
+        ) t),'[]'::jsonb) FROM group_messages m JOIN group_members gm ON gm.group_id=m.group_id AND gm.user_id=$4 JOIN users u ON u.id=m.sender_id LEFT JOIN group_messages r ON r.id=m.reply_to_id AND r.group_id=m.group_id LEFT JOIN users ru ON ru.id=r.sender_id WHERE m.group_id=$1 AND ($2::bigint=0 OR m.id<$2) ORDER BY m.id DESC LIMIT $3`, id, before, limit, user)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +144,7 @@ func (s *Store) GroupMessages(ctx context.Context, id, user string, before int64
 	out := []GroupMessage{}
 	for rows.Next() {
 		var m GroupMessage
-		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.EditedAt,&m.ForwardedFromID,&m.AttachmentName,&m.AttachmentMIME); err != nil {
+		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.EditedAt,&m.ForwardedFromID,&m.AttachmentName,&m.AttachmentMIME,&m.Reactions); err != nil {
 			return nil, err
 		}
 		if m.Kind == "image" { m.ImageURL = "/api/groups/" + id + "/messages/" + m.ID + "/image" }

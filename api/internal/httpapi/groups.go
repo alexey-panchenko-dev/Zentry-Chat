@@ -205,7 +205,7 @@ func (h *chatHandlers) groupMessageImage(w http.ResponseWriter, r *http.Request,
 	if err != nil || messageID < 1 { writeJSON(w, 404, map[string]string{"error":"not_found"}); return }
 	b, mime, err := h.store.GroupMessageImage(r.Context(), id, strconv.FormatInt(messageID, 10), u.ID)
 	if err != nil { chatFailure(w, err); return }
-	serveMedia(w, r, b, mime)
+	serveMessagePhoto(w, r, b, mime)
 }
 
 func (h *chatHandlers) groupPhoto(w http.ResponseWriter, r *http.Request, u auth.User) {

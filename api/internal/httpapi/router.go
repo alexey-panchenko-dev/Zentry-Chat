@@ -80,6 +80,10 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("POST /api/conversations", ch.signedIn(ch.createConversation))
 	chatMux.HandleFunc("GET /api/conversations", ch.signedIn(ch.listConversations))
 	chatMux.HandleFunc("GET /api/conversations/{id}/messages", ch.signedIn(ch.listMessages))
+	chatMux.HandleFunc("GET /api/favorites", ch.signedIn(ch.favorites))
+	chatMux.HandleFunc("PUT /api/favorites/{scope}/{messageID}", ch.signedIn(ch.setFavorite))
+	chatMux.HandleFunc("DELETE /api/favorites/{scope}/{messageID}", ch.signedIn(ch.setFavorite))
+	chatMux.HandleFunc("GET /api/conversations/{id}/first-unread", ch.signedIn(ch.firstUnread))
 	chatMux.HandleFunc("GET /api/conversations/{id}/search", ch.signedIn(ch.searchMessages))
 	chatMux.HandleFunc("GET /api/conversations/{id}/pins", ch.signedIn(ch.listPins))
 	chatMux.HandleFunc("POST /api/conversations/{id}/pins", ch.signedIn(ch.setPin))
@@ -92,7 +96,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
 	protectedChat := protectAPI(chatMux, 120)
-	for _, pattern := range []string{"/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()

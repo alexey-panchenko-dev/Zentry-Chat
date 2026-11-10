@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
 	"image/jpeg"
 	"net/http"
 	"newsChat/api/internal/auth"
@@ -97,5 +98,39 @@ func (h *chatHandlers) messageImage(w http.ResponseWriter, r *http.Request, u au
 		chatFailure(w, err)
 		return
 	}
-	serveMedia(w, r, b, m)
+	serveMessagePhoto(w, r, b, m)
+}
+
+func serveMessagePhoto(w http.ResponseWriter, r *http.Request, original []byte, mimeType string) {
+	if r.URL.Query().Get("preview") != "1" {
+		serveMedia(w, r, original, mimeType)
+		return
+	}
+	source, err := jpeg.Decode(bytes.NewReader(original))
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "invalid_image"})
+		return
+	}
+	bounds := source.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	const maxEdge = 320
+	longest := max(width, height)
+	if longest <= maxEdge {
+		serveMedia(w, r, original, mimeType)
+		return
+	}
+	outWidth, outHeight := max(1, width*maxEdge/longest), max(1, height*maxEdge/longest)
+	preview := image.NewRGBA(image.Rect(0, 0, outWidth, outHeight))
+	for y := 0; y < outHeight; y++ {
+		for x := 0; x < outWidth; x++ {
+			px := source.At(bounds.Min.X+x*width/outWidth, bounds.Min.Y+y*height/outHeight)
+			preview.SetRGBA(x, y, color.RGBAModel.Convert(px).(color.RGBA))
+		}
+	}
+	var encoded bytes.Buffer
+	if err := jpeg.Encode(&encoded, preview, &jpeg.Options{Quality: 75}); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "invalid_image"})
+		return
+	}
+	serveMedia(w, r, encoded.Bytes(), "image/jpeg")
 }
