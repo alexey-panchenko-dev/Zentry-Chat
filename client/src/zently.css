@@ -177,8 +177,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 
 /* Quiet chat texture; bubbles remain opaque and easy to read. */
 .z-message-scroll{background-color:#0e0b10;background-image:radial-gradient(ellipse at 12% 12%,#ff149308,transparent 55%),radial-gradient(ellipse at 90% 85%,#b7ff3905,transparent 55%);background-size:100% 100%,100% 100%;background-attachment:local}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{background:linear-gradient(145deg,#29232e,#211c25);border:1px solid #b7a0bd20;border-radius:20px 20px 20px 6px;box-shadow:0 4px 14px #00000020;padding:13px 16px 10px}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{left:0;top:17px;bottom:17px;width:2px;border-radius:2px;background:#ff68b88c;box-shadow:0 0 8px #ff149330}
 .z-message-meta .z-read-check{color:var(--z-lime)}.z-message-meta .z-dark-check{color:#170a11}
 /* Stable vertical landmarks across expanded and compact navigation. */
 .z-sidebar-head,.is-compact .z-sidebar-head{width:100%;height:58px;min-height:58px;flex:0 0 58px;box-sizing:border-box;display:flex;flex-direction:row;justify-content:center;align-items:flex-start;padding:0 0 24px;gap:0}
@@ -191,15 +189,10 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-sidebar,.z-dialogs{background-color:#100d12;background-image:radial-gradient(ellipse 130% 65% at 120% -15%,#63334b24,transparent 72%),linear-gradient(165deg,#171219 0%,#100d12 48%,#0d0c10 100%);background-clip:padding-box;background-size:100% 100%;background-repeat:no-repeat}
 .z-dialogs{background-image:radial-gradient(ellipse 100% 55% at 115% 105%,#56623b12,transparent 75%),radial-gradient(ellipse 120% 55% at 110% -10%,#70344e24,transparent 72%),linear-gradient(165deg,#18131a,#100d12 48%,#0e0d11);box-shadow:inset 0 1px 0 #ffffff04}
 
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff149326,transparent 64%),linear-gradient(135deg,#332630,#272129 58%,#211d24);border:1px solid #ff81c03b;border-radius:22px 22px 22px 9px;box-shadow:inset 0 1px 0 #ffffff12,0 7px 21px #0000002b,-3px 0 16px #ff149321}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{top:19px;bottom:19px;width:2px;background:linear-gradient(transparent,#ff54ad,#ff1493,transparent);box-shadow:0 0 8px #ff14938a,0 0 18px #ff14934d}
 
 .z-bubble-row.is-own .z-bubble{border-radius:22px 22px 7px 22px}
 
 /* Focus the neon on messages rather than the whole conversation canvas. */
-.z-bubble-row.is-own .z-bubble{border-color:#ff6db8;box-shadow:inset 0 1px 0 #ffc7e25e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{border-color:#ff79b04d;box-shadow:inset 0 1px 0 #ffffff13,-4px 0 13px #ff14934f,0 8px 24px #00000038}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:before{box-shadow:0 0 8px #ff1493b0,0 0 20px #ff149368}
 
 /* Soft neon atmosphere lives in the chat background, clear of the text. */
 .z-message-scroll{background-color:#100b13;background-image:radial-gradient(ellipse 60% 45% at 7% 22%,#ff149326,transparent 74%),radial-gradient(ellipse 55% 50% at 98% 78%,#b7ff3915,transparent 76%),radial-gradient(ellipse 65% 55% at 75% 8%,#ff149315,transparent 80%),linear-gradient(150deg,#171019 0%,#0e0b12 55%,#121015 100%);background-size:100% 100%;background-attachment:local}
@@ -319,7 +312,6 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 
 /* Match the photo corners to the bubble and give messages a clearer direction. */
 .z-bubble-row.is-own .z-bubble{border-radius:18px 18px 5px 18px}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble{border-radius:18px 18px 18px 5px}
 .z-bubble:has(.z-image-message){border-radius:18px 18px 5px 18px}
 .z-bubble-row:not(.is-own):not(.is-system) .z-bubble:has(.z-image-message){border-radius:18px 18px 18px 5px}
 .z-bubble-row.is-own .z-message-image-button{border-radius:14px 14px 3px 14px}
@@ -338,12 +330,8 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-chat-image-dialog .z-close-image{background:#211a25f2}}
 
 /* Let the chat atmosphere softly pass through text bubbles, while keeping their colors distinct. */
-.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(145deg,#eb007ecc,#b1005dd9);backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(14px) saturate(130%);box-shadow:inset 0 1px 0 #ffc7e26e,0 0 0 1px #ff14932b,0 0 14px #ff14935e,0 0 32px #ff149329}
-.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff14932b,transparent 64%),linear-gradient(135deg,#332630d9,#272129d1 58%,#211d24d4);backdrop-filter:blur(14px) saturate(125%);-webkit-backdrop-filter:blur(14px) saturate(125%);box-shadow:inset 0 1px 0 #ffffff1c,-4px 0 13px #ff14934f,0 8px 24px #00000038}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(150deg,#eb007e,#b1005d)}.z-bubble-row:not(.is-own):not(.is-system) .z-bubble:not(.is-image-bubble){background:radial-gradient(ellipse 130% 160% at -18% 42%,#ff149326,transparent 64%),linear-gradient(135deg,#332630,#272129 58%,#211d24)}}
 
 /* Sent bubbles stay fully opaque; keep the frosted treatment on received text only. */
-.z-bubble-row.is-own .z-bubble:not(.is-image-bubble){background:linear-gradient(145deg,#eb007e,#b1005d);backdrop-filter:none;-webkit-backdrop-filter:none}
 
 /* Reserve space for every recording action so the mic, cancel, and send buttons never overlap. */
 .z-composer>.z-voice-composer[data-active=true]{display:grid;grid-template-columns:minmax(0,1fr) 44px 44px;align-items:center;gap:8px;width:100%;flex:1 1 100%;min-width:0}
@@ -636,5 +624,3 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 .z-chat-row[data-pinned=true]{order:-1}
 
 /* Keep message actions inside the scrolling history, including the first message. */
-.z-message-menu-items{position:static;margin-top:6px;min-width:min(168px,58vw);box-shadow:none}
-.z-bubble-row:has(.z-message-menu[open]) .z-bubble{max-width:100%}

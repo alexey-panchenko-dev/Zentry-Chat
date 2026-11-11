@@ -3,7 +3,7 @@ import type { Conversation } from './api'
 import type { ChatOptions } from './ChatWorkspace'
 
 export const defaultAppearance = {
-  text: 'normal', density: 'normal', motion: 'full', backdrop: 'zently',
+  text: 'normal', density: 'normal', motion: 'full', backdrop: 'zently', navSide: 'right',
   preview: true, sound: false, enter: true,
 }
 
@@ -15,11 +15,12 @@ export function AppearanceSettings({ value, update }: { value: Appearance; updat
     ['density','Интервалы в чате',[['normal','Обычные'],['compact','Компактные']]],
     ['motion','Анимации',[['full','Плавные'],['reduced','Минимальные']]],
     ['backdrop','Фон чата',[['zently','Zently'],['graphite','Графит'],['plum','Слива']]],
+    ['navSide','Панель навигации',[['right','Справа'],['left','Слева']]],
   ] as const
   return <section className="z-appearance">
     <h2>Оформление и сообщения</h2>
     {options.map(([key,label,choices]) => <label className="z-setting-row" key={key}>{label}
-      <select value={value[key]} onChange={event => update({ ...value, [key]: event.target.value })}>{choices.map(([id,text]) => <option key={id} value={id}>{text}</option>)}</select>
+      <select value={value[key] ?? defaultAppearance[key]} onChange={event => update({ ...value, [key]: event.target.value })}>{choices.map(([id,text]) => <option key={id} value={id}>{text}</option>)}</select>
     </label>)}
     {([['preview','Текст в уведомлениях'],['sound','Звук новых сообщений'],['enter','Enter отправляет сообщение']] as const).map(([key,label]) =>
       <label className="z-setting-row" key={key}>{label}<input type="checkbox" checked={value[key]} onChange={event => update({ ...value, [key]: event.target.checked })}/></label>)}

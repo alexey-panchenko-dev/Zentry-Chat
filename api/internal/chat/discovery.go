@@ -29,7 +29,7 @@ func scanProfile(row pgx.Row) (Profile, error) {
 	return p, err
 }
 func (s *Store) Profile(ctx context.Context, id string) (Profile, error) {
-	return scanProfile(s.db.QueryRow(ctx, `SELECT `+profileColumns+` FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id))
+	return scanProfile(s.db.QueryRow(ctx, `SELECT `+profileColumns+` FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1 AND u.email_verified=true`, id))
 }
 
 type OwnerProfile struct {
@@ -43,7 +43,7 @@ func (s *Store) OwnProfile(ctx context.Context, id string) (OwnerProfile, error)
 		return OwnerProfile{}, err
 	}
 	result := OwnerProfile{Profile: p}
-	err = s.db.QueryRow(ctx, `SELECT to_char(p.birth_date,'YYYY-MM-DD') FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id).Scan(&result.BirthDate)
+	err = s.db.QueryRow(ctx, `SELECT to_char(p.birth_date,'YYYY-MM-DD') FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1 AND u.email_verified=true`, id).Scan(&result.BirthDate)
 	return result, err
 }
 func (s *Store) UpdateProfile(ctx context.Context, id, name string, age *int, bio, city string) (Profile, error) {
@@ -87,7 +87,7 @@ func (s *Store) Discovery(ctx context.Context, id string, incoming bool) ([]Prof
 	if incoming {
 		filter = `EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=u.id AND v.target_id=$1 AND v.liked) AND NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id)`
 	}
-	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
+	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.email_verified=true AND u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, errorText } from './api'
+import { Bookmark } from 'lucide-react'
+import { ActionMenu } from './ActionMenu'
 
 export type Favorite = { id: string; chat_id: string; scope: 'personal' | 'group'; title: string; body: string; kind: string; saved_at: string }
 
@@ -31,10 +33,10 @@ export function FavoritesPanel({ onOpen }: { onOpen: (item: Favorite) => Promise
     <p className="z-muted">Эти сообщения видны только вам.</p>
     {items.isPending && <p role="status">Загружаем избранное…</p>}
     {items.isError && <p role="alert" className="notice">{errorText(items.error)}</p>}
-    {items.data?.length === 0 && <p>Сохраните сообщение через меню рядом с ним.</p>}
+    {items.data?.length === 0 && <div className="z-favorites-empty"><Bookmark size={30}/><h2>Важное — под рукой</h2><p>Откройте меню сообщения и выберите «В избранное», чтобы сохранить его здесь.</p></div>}
     {items.data?.map(item => <div className="z-favorite-item" key={item.scope + item.id}>
       <button type="button" onClick={() => { setError(''); void onOpen(item).catch(() => setError('Исходная переписка больше не доступна.')) }}>
-        <strong>{item.title}</strong><span>{item.body || 'Вложение'}</span>
+        <strong>{item.title}</strong><span>{item.body || 'Вложение'}</span><time dateTime={item.saved_at}>{new Date(item.saved_at).toLocaleDateString('ru-RU', {dateStyle:'long'})}</time>
       </button>
       <button type="button" className="z-icon" aria-label="Убрать из избранного" disabled={change.isPending} onClick={() => change.mutate({ ...item, save: false })}>×</button>
     </div>)}
@@ -71,21 +73,48 @@ export function ChatRow({ label, selected, options, onOpen, onFirstUnread, onCha
   label: string; selected: boolean; options?: ChatOptions; onOpen: () => void; onFirstUnread?: () => void;
   onChange: (option: keyof ChatOptions) => void; children: React.ReactNode
 }) {
-  const [open, setOpen] = useState(false)
-  const start = useRef<{ x: number; y: number; id: number } | null>(null)
-  return <div className="z-chat-row" data-pinned={!!options?.pinned} onPointerDown={event => {
-    if (event.pointerType === 'touch' && event.isPrimary) start.current = { x: event.clientX, y: event.clientY, id: event.pointerId }
-  }} onPointerCancel={() => { start.current = null }} onPointerUp={event => {
-    const origin = start.current
-    start.current = null
-    if (origin && origin.id === event.pointerId && origin.x - event.clientX > 56 && Math.abs(origin.y - event.clientY) < 18) setOpen(true)
+  const row = useRef<HTMLDivElement>(null)
+  const gesture = useRef<{ x: number; y: number; id: number; timer: number } | null>(null)
+  const suppressClick = useRef(false)
+
+  function stopGesture() {
+    if (gesture.current) window.clearTimeout(gesture.current.timer)
+    gesture.current = null
+  }
+  function showMenu() {
+    const menu = row.current?.querySelector<HTMLDetailsElement>('details')
+    if (menu) menu.open = true
+  }
+  useEffect(() => stopGesture, [])
+  return <div ref={row} className="z-chat-row" data-pinned={!!options?.pinned} onContextMenu={event => {
+    event.preventDefault()
+    showMenu()
+  }} onPointerDown={event => {
+    if (event.pointerType !== 'touch' || !event.isPrimary || (event.target as Element).closest('summary')) return
+    stopGesture()
+    suppressClick.current = false
+    const timer = window.setTimeout(() => { suppressClick.current = true; showMenu() }, 460)
+    gesture.current = { x: event.clientX, y: event.clientY, id: event.pointerId, timer }
+  }} onPointerMove={event => {
+    const start = gesture.current
+    if (start && (Math.abs(event.clientX - start.x) > 10 || Math.abs(event.clientY - start.y) > 10)) stopGesture()
+  }} onPointerCancel={stopGesture} onPointerUp={event => {
+    const start = gesture.current
+    stopGesture()
+    if (start && start.id === event.pointerId && start.x - event.clientX > 56 && Math.abs(start.y - event.clientY) < 18) {
+      suppressClick.current = true
+      showMenu()
+    }
   }}>
-    <button type="button" className={'z-conversation' + (selected ? ' is-selected' : '')} onClick={() => { if (open) setOpen(false); else onOpen() }}>{children}</button>
-    <button type="button" className="z-chat-row-menu z-icon" aria-label={'Действия: ' + label} aria-expanded={open} onClick={() => setOpen(!open)}>···</button>
-    {open && <div className="z-chat-quick-actions">{onFirstUnread&&<button type="button" onClick={()=>{setOpen(false);onFirstUnread()}}>К первому непрочитанному</button>}
-      <button type="button" onClick={() => { onChange('pinned'); setOpen(false) }}>{options?.pinned ? 'Открепить' : 'Закрепить чат'}</button>
-      <button type="button" onClick={() => { onChange('unread'); setOpen(false) }}>{options?.unread ? 'Снять пометку' : 'Пометить непрочитанным'}</button>
-      <button type="button" onClick={() => { onChange('muted'); setOpen(false) }}>{options?.muted ? 'Включить уведомления' : 'Отключить уведомления'}</button>
-    </div>}
+    <button type="button" className={'z-conversation' + (selected ? ' is-selected' : '')} onClick={() => {
+      if (suppressClick.current) { suppressClick.current = false; return }
+      onOpen()
+    }}>{children}</button>
+    <ActionMenu className="z-chat-row-menu" label={'Действия: ' + label}>
+      {onFirstUnread && <button type="button" onClick={onFirstUnread}>К первому непрочитанному</button>}
+      <button type="button" onClick={() => onChange('pinned')}>{options?.pinned ? 'Открепить' : 'Закрепить чат'}</button>
+      <button type="button" onClick={() => onChange('unread')}>{options?.unread ? 'Снять пометку' : 'Пометить непрочитанным'}</button>
+      <button type="button" onClick={() => onChange('muted')}>{options?.muted ? 'Включить уведомления' : 'Отключить уведомления'}</button>
+    </ActionMenu>
   </div>
 }

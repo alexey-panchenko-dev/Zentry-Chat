@@ -33,6 +33,10 @@ Compose на Render не используется.
   health check продолжит работать, запросы браузера будут закрыты до настройки.
 - PUSHER_APP_ID, PUSHER_KEY, PUSHER_SECRET, PUSHER_CLUSTER — из локальных настроек
   того же приложения Pusher. Secret вводите только в секретное поле сервера.
+- SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM и SITE_URL — для кодов подтверждения
+  и восстановления пароля. Для обычного Gmail используйте адрес отправителя как
+  SMTP_USERNAME/SMTP_FROM и отдельный пароль приложения Google; обычный пароль
+  аккаунта не подходит. SMTP_HOST=smtp.gmail.com и SMTP_PORT=587.
 
 Скопируйте выданный HTTPS-адрес API. /api/ready должен вернуть status=ok, database=ok.
 Бесплатный Render засыпает после простоя; первый запрос может потребовать ожидания/повтора.
