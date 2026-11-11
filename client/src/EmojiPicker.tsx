@@ -11,6 +11,9 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
   disabled?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [usage, setUsage] = useState<Record<string, number>>(() => {
+    try { const saved = JSON.parse(localStorage.getItem('zently-emoji-usage') || '{}'); return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {} } catch { return {} }
+  })
   const [catalogue, setCatalogue] = useState<{ emoji: string; name: string; key: string }[]>([])
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(84)
@@ -45,6 +48,9 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
     const next = value.slice(0, start) + emoji + value.slice(end)
     if (input && input.maxLength > 0 && next.length > input.maxLength) return
     onChange(next)
+    const updated = { ...usage, [emoji]: (Number(usage[emoji]) || 0) + 1 }
+    setUsage(updated)
+    try { localStorage.setItem('zently-emoji-usage', JSON.stringify(updated)) } catch { /* Works without persistent storage. */ }
     setOpen(false)
     requestAnimationFrame(() => {
       input?.focus({ preventScroll: true })
@@ -57,8 +63,8 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
       {open ? <X size={18}/> : <Smile size={19}/>}
     </button>
     {open && <div className="z-emoji-panel" role="group" aria-label="Выберите смайлик">
-      <strong>Смайлики Apple{catalogue.length ? ` · ${catalogue.length}` : ''}</strong>
       <input aria-label="Найти смайлик" placeholder="Поиск смайликов…" value={search} onChange={event => { setSearch(event.target.value); setLimit(84) }} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault() }}/>
+      {!search.trim() && <section className="z-emoji-frequent" aria-label="Часто используемые"><small>Часто используемые</small><div className="z-emoji-grid">{[...new Set([...Object.keys(usage).sort((a,b)=>(Number(usage[b])||0)-(Number(usage[a])||0)),...emojis])].slice(0,14).map(emoji=><button type="button" key={emoji} aria-label={`Вставить ${emoji}`} onPointerDown={event=>{if(event.pointerType==='mouse')event.preventDefault()}} onClick={()=>insert(emoji)}><Emoji emoji={emoji}/></button>)}</div></section>}
       <div className="z-emoji-grid">{matches.slice(0, limit).map(({ emoji, name, key }) => <button type="button" key={key} aria-label={`Вставить ${emoji}`} title={name} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onClick={() => insert(emoji)}><Emoji emoji={emoji}/></button>)}</div>
       {matches.length > limit && <button type="button" className="z-emoji-more" onClick={() => setLimit(value => value + 84)}>Ещё смайлики</button>}
       {!matches.length && <small>Ничего не найдено.</small>}
