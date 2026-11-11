@@ -425,3 +425,5 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-conversation-list{padding-right:15px;box-sizing:border-box;scrollbar-gutter:stable}.z-conversation-list>.z-chat-row{min-width:0;max-width:100%;flex-shrink:0}
 
 .z-conversation-list .z-notes-row{margin:0 0 5px;border:0;background:transparent}.z-conversation-list .z-notes-row>span>strong{font-size:19px;font-weight:650}.z-notes-row .z-group-avatar img{width:26px;height:26px;object-fit:contain}.z-conversation-list .z-notes-row.is-selected{background:#ff149312;box-shadow:inset 2px 0 #ff1493}
+
+.z-conversation-list .z-conversation{min-height:72px;padding:10px 12px;margin-bottom:0}.z-conversation-list>.z-chat-row+.z-chat-row{margin-top:2px;padding-top:2px}.z-conversation-list .z-notes-row{margin-bottom:2px}
