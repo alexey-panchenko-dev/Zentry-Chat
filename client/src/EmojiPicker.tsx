@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Smile, X } from 'lucide-react'
+import { Smile, X, Grid2X2, Heart, ThumbsUp, PartyPopper, PawPrint, Apple, Plane, Shapes, Flag } from 'lucide-react'
 import { Emoji } from './Emoji'
 
 const emojis = ['😀','😃','😄','😁','😆','😅','😂','🙂','😉','😊','😍','🥰','😘','😎','🤔','🙃','😭','😡','👍','👎','❤️','🔥','🎉','🙏','🫶','👏','💯','✨']
@@ -15,6 +15,7 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
     try { const saved = JSON.parse(localStorage.getItem('zently-emoji-usage') || '{}'); return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {} } catch { return {} }
   })
   const [catalogue, setCatalogue] = useState<{ emoji: string; name: string; key: string }[]>([])
+  const [category,setCategory]=useState('all')
   const [search, setSearch] = useState('')
   const [limit, setLimit] = useState(84)
   const [loadError, setLoadError] = useState(false)
@@ -39,7 +40,8 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
     }
   }, [open])
 
-  const matches = catalogue.length ? catalogue.filter(item => !search.trim() || item.name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru')) || item.emoji === search.trim()) : emojis.map(emoji => ({ emoji, name: emoji, key: emoji }))
+  const categories=[['all','Все',Grid2X2],['серд|любов|поцел','Сердечки',Heart],['рук|пальц|ладон|кулак|жест','Жесты',ThumbsUp],['празд|конфетти|подар|салют|вечерин','Праздники',PartyPopper],['сме|улыб|лицо|плач|груст|зли|счаст|смущ|испуг','Лица',Smile],['кот|собак|цвет|дерев|птиц|живот|растен','Природа',PawPrint],['еда|фрукт|яблок|торт|хлеб|мяс|напит|овощ','Еда',Apple],['машин|автомоб|самолет|поезд|город|дом|кораб','Транспорт',Plane],['знак|символ|кнопка|инструмент|предмет','Символы',Shapes],['флаг','Флаги',Flag]] as const
+  const matches = catalogue.length ? catalogue.filter(item => (category==='all'||!!search.trim()||new RegExp(category,'i').test(item.name))).filter(item => !search.trim() || item.name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru')) || item.emoji === search.trim()) : emojis.map(emoji => ({ emoji, name: emoji, key: emoji }))
 
   function insert(emoji: string) {
     const input = inputRef.current
@@ -63,8 +65,9 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
       {open ? <X size={18}/> : <Smile size={19}/>}
     </button>
     {open && <div className="z-emoji-panel" style={{right:root.current?root.current.getBoundingClientRect().right-(root.current.closest('.z-workspace')?.getBoundingClientRect().right??root.current.getBoundingClientRect().right)+16:16}} role="group" aria-label="Выберите смайлик">
+      <nav className="z-emoji-categories" aria-label="Категории смайликов">{categories.map(([id,label,Icon])=><button type="button" key={id} title={label} aria-label={label} aria-pressed={category===id} onClick={()=>{setCategory(id);setSearch('');setLimit(84);root.current?.querySelector('.z-emoji-panel>.z-emoji-grid')?.scrollTo({top:0})}}><Icon size={18}/></button>)}</nav>
       <input aria-label="Найти смайлик" placeholder="Поиск смайликов…" value={search} onChange={event => { setSearch(event.target.value); setLimit(84) }} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault() }}/>
-      {!search.trim() && <section className="z-emoji-frequent" aria-label="Часто используемые"><small>Часто используемые</small><div className="z-emoji-grid">{[...new Set([...Object.keys(usage).sort((a,b)=>(Number(usage[b])||0)-(Number(usage[a])||0)),...emojis])].slice(0,14).map(emoji=><button type="button" key={emoji} aria-label={`Вставить ${emoji}`} onPointerDown={event=>{if(event.pointerType==='mouse')event.preventDefault()}} onClick={()=>insert(emoji)}><Emoji emoji={emoji}/></button>)}</div></section>}
+      {!search.trim() && category==='all' && <section className="z-emoji-frequent" aria-label="Часто используемые"><small>Часто используемые</small><div className="z-emoji-grid">{[...new Set([...Object.keys(usage).sort((a,b)=>(Number(usage[b])||0)-(Number(usage[a])||0)),...emojis])].slice(0,14).map(emoji=><button type="button" key={emoji} aria-label={`Вставить ${emoji}`} onPointerDown={event=>{if(event.pointerType==='mouse')event.preventDefault()}} onClick={()=>insert(emoji)}><Emoji emoji={emoji}/></button>)}</div></section>}
       <div className="z-emoji-grid" onScroll={event => {
         const grid = event.currentTarget
         if (grid.scrollHeight - grid.scrollTop - grid.clientHeight < 100 && limit < matches.length) {
