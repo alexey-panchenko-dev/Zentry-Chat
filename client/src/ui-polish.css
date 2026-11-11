@@ -431,3 +431,5 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-conversation-list>.z-notes-row{border:0;position:relative}.z-conversation-list>.z-notes-row::after{content:'';position:absolute;bottom:0;left:12px;right:12px;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(166,164,174,.18) 22%,rgba(166,164,174,.18) 78%,transparent 100%);pointer-events:none}.z-conversation-list>.z-notes-row+.z-chat-row{border-top:0}
 
 .z-conversation-list .z-notes-row .z-group-avatar{display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.z-conversation-list .z-notes-row .z-group-avatar>img{position:static!important;inset:auto!important;display:block;width:28px!important;height:28px!important;min-width:0;max-width:28px;object-fit:contain!important;border-radius:0;transform:none!important;margin:0;flex:0 0 28px}
+
+.z-conversation-list>.z-notes-row{border-bottom:1px solid transparent!important;border-image:linear-gradient(90deg,transparent 3%,rgba(166,164,174,.24) 22%,rgba(166,164,174,.24) 78%,transparent 97%) 1;margin-bottom:4px;padding-bottom:12px}.z-conversation-list>.z-notes-row::after{display:none}
