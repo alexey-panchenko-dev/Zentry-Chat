@@ -29,7 +29,7 @@ export type Message = {
   reply_to_id?:string
   reply_body?:string
   reply_sender_name?:string
-  forwarded_from_id?:string
+  forwarded_sender_name?:string; forwarded_from_id?:string
   edited_at?:string
   attachment_url?:string
   attachment_name?:string

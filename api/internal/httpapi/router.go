@@ -99,8 +99,9 @@ func newRouterWithMailer(db *pgxpool.Pool, mailer codeMailer, publishers ...real
 	chatMux.HandleFunc("POST /api/conversations/{id}/messages", ch.signedIn(ch.sendMessage))
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
+	chatMux.HandleFunc("POST /api/notes",ch.signedIn(func(w http.ResponseWriter,r *http.Request,u auth.User){ g,err:=ch.store.Notes(r.Context(),u.ID);if err!=nil{chatFailure(w,err);return};writeJSON(w,200,map[string]any{"group":g}) }))
 	protectedChat := protectAPI(chatMux, 600)
-	for _, pattern := range []string{"/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/notes","/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()

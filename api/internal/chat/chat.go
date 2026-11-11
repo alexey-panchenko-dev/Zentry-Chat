@@ -48,6 +48,7 @@ type Message struct {
 	ReplyToID       string    `json:"reply_to_id,omitempty"`
 	ReplyBody       string    `json:"reply_body,omitempty"`
 	ReplySenderName string    `json:"reply_sender_name,omitempty"`
+	ForwardedSenderName string `json:"forwarded_sender_name,omitempty"`
 	ForwardedFromID string    `json:"forwarded_from_id,omitempty"`
 	EditedAt        *time.Time `json:"edited_at,omitempty"`
 	DurationMS      int       `json:"duration_ms,omitempty"`
@@ -162,7 +163,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	if err := s.CheckMember(ctx, conversationID, userID); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.conversation_id::text,COALESCE(m.sender_id::text,''),m.client_message_id::text,m.body,m.created_at,CASE WHEN m.kind<>'text' THEN m.kind ELSE '' END,COALESCE(m.duration_ms,0),COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,''),COALESCE(m.forwarded_from_id::text,''),m.edited_at,COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,''),
+	rows, err := s.db.Query(ctx, `SELECT m.id::text,m.conversation_id::text,COALESCE(m.sender_id::text,''),m.client_message_id::text,m.body,m.created_at,CASE WHEN m.kind<>'text' THEN m.kind ELSE '' END,COALESCE(m.duration_ms,0),COALESCE(m.reply_to_id::text,''),COALESCE(parent.body,''),COALESCE(reply_author.name,''),COALESCE(m.forwarded_from_id::text,''),COALESCE((SELECT u.name FROM messages original JOIN users u ON u.id=original.sender_id WHERE original.id=m.forwarded_from_id),''),m.edited_at,COALESCE(m.attachment_name,''),COALESCE(m.attachment_mime,''),
         COALESCE((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.emoji) FROM (
             SELECT emoji,count(*)::int count,bool_or(user_id=$4) mine FROM message_reactions WHERE message_id=m.id GROUP BY emoji
         ) t),'[]'::jsonb)
@@ -174,7 +175,7 @@ func (s *Store) Messages(ctx context.Context, conversationID, userID string, bef
 	result := make([]Message, 0)
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.ForwardedFromID,&m.EditedAt,&m.AttachmentName,&m.AttachmentMIME,&m.Reactions); err != nil {
+		if err := rows.Scan(&m.ID, &m.ConversationID, &m.SenderID, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.DurationMS,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.ForwardedFromID,&m.ForwardedSenderName,&m.EditedAt,&m.AttachmentName,&m.AttachmentMIME,&m.Reactions); err != nil {
 			return nil, err
 		}
 		if m.Kind == "voice" {
