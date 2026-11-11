@@ -407,3 +407,7 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-shell.is-compact .z-sidebar-bottom .z-collapse svg{transform:rotate(180deg)}.z-shell[data-nav-side=right].is-compact .z-sidebar-bottom .z-collapse svg{transform:rotate(180deg)}
 
 .z-shell:not(.is-compact) .z-sidebar-bottom .z-collapse svg,.z-shell[data-nav-side=right]:not(.is-compact) .z-sidebar-bottom .z-collapse svg{transform:rotate(0deg)}
+
+/* Mirror collapse direction when navigation is placed on the left. */
+.z-shell[data-nav-side=left]:not(.is-compact) .z-sidebar-bottom .z-collapse svg{transform:rotate(180deg)}
+.z-shell[data-nav-side=left].is-compact .z-sidebar-bottom .z-collapse svg{transform:rotate(0deg)}
