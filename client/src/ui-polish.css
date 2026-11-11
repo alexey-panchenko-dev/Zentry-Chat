@@ -399,3 +399,5 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-reaction-list button>span{font-size:12px}
 
 .z-emoji-panel{height:510px;max-height:min(510px,70dvh);display:flex;flex-direction:column;overflow:hidden}.z-emoji-panel>.z-emoji-grid{min-height:0;flex:1;overflow-y:auto}.z-emoji-frequent{flex:none;padding:4px 0 8px;border-bottom:1px solid rgba(166,164,174,.12)}.z-emoji-frequent>small{display:block;color:#A6A4AE;font-size:12px;margin:0 4px 5px}.z-emoji-frequent .z-emoji-grid{grid-template-columns:repeat(7,minmax(0,1fr));max-height:none;overflow:visible}
+
+.z-emoji-panel{height:440px;max-height:min(440px,65dvh)}.z-emoji-frequent .z-emoji-grid{display:grid;gap:3px}.z-emoji-frequent button{display:grid;place-items:center;min-width:0;min-height:32px;padding:2px;border:0;border-radius:8px;background:transparent}.z-emoji-frequent button:hover{background:#ff149326}
