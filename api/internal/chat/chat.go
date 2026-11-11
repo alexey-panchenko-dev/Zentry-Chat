@@ -16,6 +16,7 @@ var ErrForbidden = errors.New("forbidden")
 var ErrConflict = errors.New("client message id already used")
 
 type PublicUser struct {
+	DisplayName string `json:"display_name,omitempty"`
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	Username  string `json:"username"`
@@ -63,7 +64,7 @@ func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 func (s *Store) SearchUsers(ctx context.Context, userID, query string) ([]PublicUser, error) {
 	rows, err := s.db.Query(ctx, `SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users
-		WHERE email_verified=true AND id<>$1 AND (strpos(lower(name),lower(trim(leading '@' from $2)))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
+		WHERE email_verified=true AND id<>$1 AND (strpos(lower(name),lower(trim(leading '@' from $2)))>0 OR email=lower($2) OR strpos(lower(username),lower(trim(leading '@' from $2)))>0 OR EXISTS(SELECT 1 FROM contact_aliases a WHERE a.owner_id=$1 AND a.peer_id=users.id AND strpos(lower(a.alias),lower($2))>0))
         ORDER BY lower(name),id LIMIT 20`, userID, query)
 	if err != nil {
 		return nil, err
