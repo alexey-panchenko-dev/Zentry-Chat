@@ -24,6 +24,7 @@ type PublicUser struct {
 }
 
 type Conversation struct {
+	LastActivity time.Time `json:"last_activity"`
 	LastMessageID string `json:"last_message_id,omitempty"`
 	FirstUnreadID string `json:"first_unread_id,omitempty"`
 	LastMessageIncoming bool `json:"last_message_incoming,omitempty"`
@@ -120,11 +121,11 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 }
 
 func (s *Store) Conversations(ctx context.Context, userID string, before int64, limit int) ([]Conversation, error) {
-	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),COALESCE(CASE recent.kind WHEN 'image' THEN 'Фото' WHEN 'voice' THEN 'Голосовое сообщение' WHEN 'file' THEN COALESCE(recent.attachment_name,'Файл') ELSE left(recent.body,160) END,''),COALESCE(recent.id::text,''),COALESCE(recent.sender_id<>$1,false), unread.total, COALESCE(unread.first_id::text,'')
+	rows, err := s.db.Query(ctx, `SELECT c.id::text,c.created_at,COALESCE(recent.created_at,c.created_at),c.position::text,u.id::text,u.name,u.username,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),COALESCE(a.alias,''),COALESCE(CASE recent.kind WHEN 'image' THEN 'Фото' WHEN 'voice' THEN 'Голосовое сообщение' WHEN 'file' THEN COALESCE(recent.attachment_name,'Файл') ELSE left(recent.body,160) END,''),COALESCE(recent.id::text,''),COALESCE(recent.sender_id<>$1,false), unread.total, COALESCE(unread.first_id::text,'')
         FROM conversation_members m JOIN conversations c ON c.id=m.conversation_id
         JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END
 		LEFT JOIN contact_aliases a ON a.owner_id=$1 AND a.peer_id=u.id
-        LEFT JOIN LATERAL (SELECT id, sender_id, kind, body, attachment_name FROM messages
+        LEFT JOIN LATERAL (SELECT id, sender_id, kind, body, attachment_name, created_at FROM messages
             WHERE conversation_id=c.id AND id>m.cleared_through ORDER BY id DESC LIMIT 1) recent ON true
         LEFT JOIN LATERAL (SELECT count(*) total, min(id) first_id FROM messages
             WHERE conversation_id=c.id AND id>GREATEST(m.last_read_id,m.cleared_through) AND sender_id IS DISTINCT FROM m.user_id) unread ON true
@@ -137,7 +138,7 @@ func (s *Store) Conversations(ctx context.Context, userID string, before int64, 
 	result := make([]Conversation, 0)
 	for rows.Next() {
 		var c Conversation
-		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.LastMessage, &c.LastMessageID, &c.LastMessageIncoming, &c.UnreadCount, &c.FirstUnreadID); err != nil {
+		if err := rows.Scan(&c.ID, &c.CreatedAt, &c.LastActivity, &c.Position, &c.Participant.ID, &c.Participant.Name, &c.Participant.Username, &c.Participant.AvatarURL, &c.DisplayName, &c.LastMessage, &c.LastMessageID, &c.LastMessageIncoming, &c.UnreadCount, &c.FirstUnreadID); err != nil {
 			return nil, err
 		}
 		result = append(result, c)
