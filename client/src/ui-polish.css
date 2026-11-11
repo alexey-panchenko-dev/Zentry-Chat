@@ -387,3 +387,6 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 
 .z-conversation-list>.z-chat-row+.z-chat-row{border-top:1px solid rgba(166,164,174,.16);margin-top:5px;padding-top:5px}
 .z-conversation-list .z-group-avatar{width:52px;height:52px;flex:0 0 52px;border:0;background:#302531;color:#c8b7c5;border-radius:50%;box-shadow:none}
+
+.z-conversation-list>.z-chat-row+.z-chat-row{border-top:0;position:relative}
+.z-conversation-list>.z-chat-row+.z-chat-row::before{content:'';position:absolute;top:0;left:12px;right:12px;height:1px;pointer-events:none;background:linear-gradient(90deg,transparent 0%,rgba(166,164,174,.18) 22%,rgba(166,164,174,.18) 78%,transparent 100%)}
