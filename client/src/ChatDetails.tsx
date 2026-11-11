@@ -6,7 +6,7 @@ import { api, errorText } from './api'
 import { MediaCenter } from './MediaCenter'
 
 export type DetailsTab = 'info' | 'media' | 'search' | 'pins'
-type ChatMessage = { id: string; body: string; kind?: string; attachment_name?: string; created_at: string }
+type ChatMessage = { id: string; body: string; kind?: string; image_url?: string; attachment_name?: string; created_at: string }
 type Scope = 'personal' | 'group'
 const pinKey = (scope: Scope, chatID: string) => [scope === 'group' ? 'group-pins' : 'pinned-messages', chatID]
 const endpoint = (scope: Scope, chatID: string) => (scope === 'group' ? '/groups/' : '/conversations/') + chatID
@@ -90,8 +90,9 @@ export function ChatDetails({ scope, chatID, initialTab = 'info', info, onJump, 
           {results.isPending && <p role="status">Ищем сообщения…</p>}
           {results.isError && <p className="notice" role="alert">{errorText(results.error)} <button type="button" onClick={() => void results.refetch()}>Повторить</button></p>}
           {results.data?.pages.flatMap(page => page.messages).map(message =>
-            <button type="button" className="z-tool-result" key={message.id} onClick={() => onJump(message.id)}>
-              <span>{messagePreview(message)}</span><small>{new Date(message.created_at).toLocaleString('ru-RU')}</small>
+            <button type="button" className="z-tool-result z-search-result-row" key={message.id} onClick={() => onJump(message.id)}>
+              {message.kind==='image'&&<img className="z-search-photo-thumb" src={(scope==='group'?`/api/groups/${chatID}/messages/${message.id}/image`:`/api/messages/${message.id}/image`)+'?preview=1'} alt="Миниатюра фотографии" loading="lazy" decoding="async"/>}
+              <span className="z-search-result-copy"><span>{messagePreview(message)}</span><small>{new Date(message.created_at).toLocaleString('ru-RU')}</small></span>
             </button>)}
           {results.isSuccess && !results.data.pages[0].messages.length && <p className="z-muted">Ничего не найдено.</p>}
           {results.hasNextPage && <button type="button" className="secondary" disabled={results.isFetchingNextPage} onClick={() => void results.fetchNextPage()}>Показать ещё</button>}
