@@ -1,0 +1,338 @@
+/* Compact controls and a consistent content hierarchy over the existing theme. */
+:root { --z-muted: #b0a6b3; --z-motion-fast: 140ms; --z-motion-ui: 190ms; }
+.z-shell { grid-template-columns: 210px 320px minmax(0, 1fr); gap: 12px; }
+.z-sidebar, .z-dialogs, .z-workspace { border-radius: 18px; border-color: #ffffff12; }
+.z-sidebar { padding: 22px 14px 16px; }
+.z-sidebar-head { padding-bottom: 25px; min-height: 74px; }
+.z-sidebar nav { gap: 5px; margin-top: 8px; }
+.z-sidebar nav button { min-height: 46px; border-radius: 12px; padding-inline: 13px; gap: 12px; font-size: 14px; }
+.z-sidebar nav button svg { width: 20px; height: 20px; }
+.z-sidebar-bottom { margin-top: auto; width: 100%; display: grid; gap: 7px; padding-top: 16px; }
+.z-sidebar-bottom .z-collapse { justify-self: end; margin: 0 0 3px; }
+.z-sidebar-bottom .z-account { margin-top: 0; padding: 12px 7px 0; }
+.z-settings-link { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 13px; border: 0; border-radius: 12px; background: transparent; text-align: left; font-size: 14px; }
+.z-settings-link svg { width: 20px; height: 20px; flex: none; }
+.z-settings-link:hover { background: #ffffff07; }
+.z-settings-link.is-active { background: var(--z-lime); color: var(--z-bg); font-weight: 650; }
+.is-compact .z-settings-link { justify-content: center; padding: 0; }
+.is-compact .z-settings-link>span { display: none; }
+.z-shell button, .z-shell summary, .z-contact-dialog button, .z-action-popup button,
+.z-forward-dialog button { background-image: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; transition-duration: 140ms; }
+.z-shell button::before, .z-shell button::after, .z-contact-dialog button::before,
+.z-contact-dialog button::after { display: none; }
+.z-shell button:hover:not(:disabled), .z-shell button:active:not(:disabled) { transform: none; filter: none; }
+.z-shell .z-icon, .z-contact-dialog .z-icon, .z-forward-dialog .z-icon {
+  width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0;
+  flex: 0 0 36px; border: 0; border-radius: 10px; background: transparent; color: #c5bbc8;
+  box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.z-icon::before, .z-icon::after { display: none; }
+.z-shell .z-icon:hover:not(:disabled), .z-contact-dialog .z-icon:hover:not(:disabled) { background: #ffffff0b; color: var(--z-text); }
+.z-icon svg { width: 18px; height: 18px; }
+.z-shell .primary, .z-contact-dialog .primary, .z-forward-dialog .primary { min-height: 38px; padding: 9px 14px; border: 0; border-radius: 10px; background: var(--z-lime); color: var(--z-bg); font-size: 14px; }
+.z-shell .secondary, .z-contact-dialog .secondary, .z-forward-dialog .secondary { min-height: 36px; padding: 8px 12px; border: 0; border-radius: 10px; background: #ffffff09; font-size: 14px; }
+.z-shell .primary:hover:not(:disabled), .z-contact-dialog .primary:hover:not(:disabled) { background: #c8ff6d; }
+.z-shell .secondary:hover:not(:disabled), .z-contact-dialog .secondary:hover:not(:disabled) { background: #ffffff12; }
+.z-dialogs { padding: 18px 12px 0; background: var(--z-surface); }
+.z-list-top { min-height: 38px; margin: 0 2px 13px; gap: 8px; }
+.z-list-top>span { font-size: 21px; font-weight: 700; }
+.z-list-top>div { display: flex; align-items: center; gap: 3px; }
+.z-list-top .z-icon:last-child { color: #ff82c3; background: #ff149312; }
+.z-search { min-height: 42px; padding: 0 8px 0 12px; border-radius: 12px; background: #ffffff05; border: 1px solid #ffffff0d; box-shadow: none; backdrop-filter: none; }
+.z-search input { font-size: 14px; min-height: 40px; padding-block: 8px; }
+.z-search .z-icon { border-radius: 50%; }
+.z-dialog-filters { display: flex; flex-wrap: nowrap; flex: none; overflow-x: auto; scrollbar-width: none; gap: 3px; padding: 8px 0 12px; }
+.z-dialog-filters button { flex: none; min-height: 30px; padding: 4px 8px; border-radius: 8px; border: 0; background: transparent; font-size: 12px; color: var(--z-muted); white-space: nowrap; }
+.z-dialog-filters button[aria-pressed=true] { color: #ffd0e8; background: #ff149318; border: 0; }
+.z-shell .z-conversation { min-height: 68px; padding: 10px 38px 10px 10px; gap: 10px; border-radius: 12px; border: 0; }
+.z-conversation strong { font-size: 15px; font-weight: 650; }
+.z-conversation small { font-size: 12px; line-height: 1.45; }
+.z-conversation .z-avatar, .z-conversation .z-group-avatar { width: 42px; height: 42px; min-width: 42px; }
+.z-conversation.is-selected { background: #ff149312; box-shadow: inset 2px 0 #ff1493; }
+.z-conversation.is-selected::before { display: none; }
+.z-chat-row-menu { position: absolute; right: 3px; top: 18px; }
+/* Keep the unread count in the card's upper-right corner, separate from the menu button. */
+.z-chat-row>.z-conversation { padding-right: 82px; }
+.z-chat-row>.z-conversation .z-unread { position: absolute; top: 8px; right: 54px; margin: 0; z-index: 1; }
+.z-action-menu { display: inline-flex; flex: none; }
+.z-action-menu>summary { width: 32px; min-width: 32px; height: 32px; display: grid; place-items: center; padding: 0; list-style: none; border: 0; border-radius: 8px; background: transparent; color: var(--z-muted); cursor: pointer; transition: background 140ms, opacity 140ms; }
+.z-action-menu>summary::-webkit-details-marker { display: none; }
+.z-action-menu>summary:hover, .z-action-menu[open]>summary { background: #ffffff0d; color: var(--z-text); }
+.z-action-menu>summary[aria-disabled=true] { opacity: .4; cursor: not-allowed; }
+.z-action-menu>summary:focus-visible { outline: 2px solid var(--z-lime); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .z-chat-row-menu, .z-message-menu { opacity: 0; }
+  .z-chat-row:hover .z-chat-row-menu, .z-chat-row:focus-within .z-chat-row-menu,
+  .z-chat-row-menu[open], .z-bubble-row:hover .z-message-menu,
+  .z-bubble-row:focus-within .z-message-menu, .z-message-menu[open] { opacity: 1; }
+}
+.z-action-popup { position: fixed; z-index: 100; display: grid; gap: 2px; width: max-content; min-width: 196px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow: auto; padding: 6px; background: #211b25; color: var(--z-text); border: 1px solid #ffffff1a; border-radius: 12px; box-shadow: 0 12px 36px #0006; animation: z-surface-in 150ms ease both; }
+.z-action-popup>button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; text-align: left; font-size: 14px; }
+.z-action-popup>button:hover:not(:disabled) { background: #ffffff0b; }
+.z-action-popup .z-reaction-picker { display: flex; gap: 3px; border-top: 1px solid #ffffff10; padding-top: 6px; margin-top: 4px; }
+.z-action-popup .z-reaction-picker button { min-width: 30px; min-height: 34px; padding: 4px; font-size: 19px; border: 0; background: transparent; border-radius: 7px; }
+.z-action-popup .z-reaction-picker button:hover { background: #ffffff0c; }
+.z-shell .z-messages>.z-chat-header { height: 64px; min-height: 64px; flex: 0 0 64px; margin: 0; padding: 10px 60px 10px 18px; border-radius: 0; border: 0; border-bottom: 1px solid #ffffff0c; background: #161119; gap: 6px; box-shadow: none; }
+.z-header-profile { gap: 10px; min-width: 0; }
+.z-header-profile .z-avatar { width: 38px; height: 38px; min-width: 38px; }
+.z-header-profile strong, .z-chat-header h2 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.z-header-profile small, .z-chat-header p { font-size: 12px; }
+.z-shell .z-call-panel.is-idle:not(.no-peer) { top: 14px; right: 18px; }
+.z-shell .z-call-panel.is-idle:not(.no-peer) .z-call-launch { width: 36px; height: 36px; min-width: 36px; min-height: 36px; flex-basis: 36px; background: transparent; border: 0; box-shadow: none; padding: 0; }
+.z-shell .z-call-panel.is-idle:not(.no-peer) .z-call-launch:hover { background: #ffffff0b; }
+.z-pinned-bar { display: flex; align-items: stretch; min-width: 0; flex: none; min-height: 44px; padding: 3px 15px; border-bottom: 1px solid #ffffff0a; background: #ffffff03; gap: 8px; }
+.z-pinned-bar>button { display: flex; align-items: center; flex: 1; gap: 9px; min-width: 0; border: 0; padding: 5px 2px; background: transparent; color: var(--z-muted); text-align: left; }
+.z-pinned-bar>button>svg:first-child { flex: none; color: #ff82c3; }
+.z-pinned-bar>button>span { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.z-pinned-bar small { color: #ffb7db; font-size: 11px; }
+.z-pinned-bar>button>span>span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #d7ceda; }
+.z-pinned-bar .z-pin-count { flex: 0 0 auto; font-size: 12px; }
+.z-shell .z-messages.z-group-view>.z-chat-header { padding-right: 14px; }
+.z-group-heading { flex: 1; min-width: 0; }
+.z-group-heading p { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.z-shell .z-message-scroll { gap: 14px; padding: 22px 24px 18px; scroll-padding-bottom: 15px; }
+.z-shell .z-bubble { min-width: 100px; border-radius: 13px 13px 13px 4px; padding: 10px 30px 8px 12px; border: 0; background: #27212b; box-shadow: none; }
+.z-shell .z-bubble::before, .z-shell .z-bubble::after { display: none; }
+.z-shell .is-own .z-bubble { border-radius: 13px 13px 4px 13px; border: 0; background: #ac095e; box-shadow: none; }
+.z-shell .z-bubble>p { font-size: 15px; line-height: 1.5; }
+.z-shell .z-message-scroll .z-bubble-row .z-bubble { background: #27212b; border: 0; box-shadow: none; padding: 10px 12px 8px; border-radius: 13px 13px 13px 4px; }
+.z-shell .z-bubble>p, .z-shell .z-bubble>.z-group-sender { padding-right: 18px; }
+.z-message-meta { width: 100%; justify-content: flex-end; text-align: right; margin-left: auto; }
+.z-shell .z-message-scroll .z-bubble-row.is-own .z-bubble { background: #ac095e; border: 0; box-shadow: none; border-radius: 13px 13px 4px 13px; }
+.z-shell .z-message-scroll .z-bubble-row .z-bubble.is-image-bubble,
+.z-shell .z-message-scroll .z-bubble-row .z-bubble:has(.z-image-message) { padding: 3px 3px 6px; }
+.z-message-meta, .is-own .z-message-meta { font-size: 11px; color: #c7b8ca; }
+.is-own .z-message-meta { color: #f1c3db; }
+.z-message-meta .z-read-check { color: var(--z-lime); }
+.z-shell .is-system .z-bubble { background: #ffffff05; color: var(--z-muted); }
+.z-message-tools { display: contents; }
+.z-message-menu { position: absolute; right: 2px; top: 3px; font-size: 12px; }
+.z-message-menu>summary { width: 26px; min-width: 26px; height: 26px; border-radius: 7px; background: transparent; }
+.z-message-menu>summary svg { width: 16px; height: 16px; }
+.z-reaction-list { margin-top: 7px; }
+.z-reaction-list:empty { display: none; }
+.z-reaction-list button { min-height: 26px; border: 0; border-radius: 8px; background: #ffffff09; }
+.z-shell .z-bubble.is-image-bubble, .z-shell .z-bubble:has(.z-image-message) { padding: 3px 3px 6px; overflow: visible; }
+.z-bubble .z-image-message, .z-bubble .z-message-image-button { border: 0; box-shadow: none; }
+.z-bubble .z-message-image-button img { border: 0; }
+.z-bubble.is-image-bubble .z-message-meta { padding-inline: 8px; }
+.z-shell .z-bubble.is-image-bubble>p { padding-inline: 8px; }
+.z-messages>.z-composer-region { position: relative; left: auto; right: auto; bottom: auto; z-index: 2; flex: none; background: transparent; border: 0; padding: 10px 16px 14px; }
+.z-composer { display: flex; gap: 7px; align-items: center; background: transparent; }
+.z-composer-field { min-height: 42px; padding: 2px 13px; border: 1px solid #ffffff16; border-radius: 12px; background: #1d1720; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.z-composer-field:focus-within { border-color: #ff14936b; box-shadow: none; }
+.z-composer-field textarea { min-height: 36px; max-height: 132px; padding: 7px 0; font-size: 15px; line-height: 1.5; }
+.z-composer .z-attachments-menu { order: -2; }
+.z-attachments-menu>summary { width: 36px; height: 36px; }
+.z-composer>.z-image-composer:not([data-active=true]):not([data-error=true]),
+.z-composer>.z-file-composer:not([data-active=true]) { display: contents; }
+.z-composer .z-send { width: 38px; height: 38px; min-width: 38px; min-height: 38px; flex: 0 0 38px; border: 0; border-radius: 12px; background: var(--z-lime); color: #151a0e; box-shadow: none; }
+.z-composer .z-send svg { width: 19px; height: 19px; }
+.z-composer:has(.z-image-composer[data-active=true]) .z-attachments-menu,
+.z-composer:has(.z-voice-composer[data-active=true]) .z-attachments-menu,
+.z-composer:has(.z-voice-composer[data-active=true]) .z-file-composer { display: none; }
+.z-composer>.z-image-composer[data-active=true] { order: -1; flex: 1; }
+.z-shell .z-settings { width: 100%; max-width: 760px; align-self: center; padding: 30px; }
+.z-settings h1 { margin: 0 0 24px; font-size: 22px; }
+.z-settings h2 { font-size: 16px; margin: 20px 0 10px; }
+.z-appearance, .z-contact-settings { margin-bottom: 24px; }
+.z-settings .z-setting-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; min-height: 52px; margin: 0; border: 0; border-bottom: 1px solid #ffffff0c; font-size: 14px; }
+.z-setting-row select { width: min(45%, 190px); flex: none; min-height: 36px; padding: 6px 10px; border-radius: 8px; border-color: #ffffff16; background: #211b26; color: #f8f3f7; }
+.z-setting-row input[type=checkbox] { flex: none; width: 19px; height: 19px; }
+.z-settings input:not([type=checkbox]), .z-settings textarea { padding: 11px 13px; border-radius: 11px; font-size: 15px; }
+.z-settings .z-field-help { font-size: 12px; }
+.z-settings .z-muted { margin-block: 14px; font-size: 13px; }
+.z-shell .z-favorites { max-width: none; height: 100%; background: #131015; }
+.z-favorites-empty { display: grid; justify-items: center; gap: 12px; width: min(360px, 100%); margin: 12vh auto 0; text-align: center; }
+.z-favorites-empty svg { color: var(--z-muted); }
+.z-favorites-empty h2 { margin: 0; font-size: 18px; }
+.z-favorites-empty p { color: var(--z-muted); line-height: 1.6; font-size: 14px; }
+.z-favorite-item { margin-top: 10px; padding: 6px 8px; border: 1px solid #ffffff0c; background: #ffffff03; border-radius: 12px; }
+.z-favorite-item time { font-size: 12px; color: var(--z-muted); }
+.z-contact-dialog.z-peer-panel, .z-contact-dialog.z-group-profile-dialog {
+  inset: 0 0 0 auto; margin: 0; width: min(450px, 100vw); height: 100dvh; max-height: 100dvh;
+  max-width: 100vw; border: 0; border-left: 1px solid #ffffff12; border-radius: 16px 0 0 16px; padding: 18px;
+  background: #17121b; animation: z-peer-enter 200ms ease both;
+}
+@keyframes z-peer-enter { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+.z-peer-panel .z-contact-dialog-head, .z-group-profile-dialog .z-contact-dialog-head { position: sticky; top: -18px; z-index: 2; padding-block: 4px 10px; margin-bottom: 4px; background: #17121b; }
+.z-contact-dialog-head h2 { font-size: 20px; }
+.z-details-tabs { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: none; margin: 0 0 18px; border-bottom: 1px solid #ffffff10; }
+.z-details-tabs button { flex: 1 0 auto; min-height: 40px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 9px; color: var(--z-muted); background: transparent; font-size: 13px; }
+.z-details-tabs button[aria-selected=true] { border-bottom-color: var(--z-pink); color: var(--z-text); }
+.z-chat-details [role=tabpanel] { min-width: 0; }
+.z-detail-search-field { display: flex; align-items: center; padding-left: 10px; border: 1px solid #ffffff16; border-radius: 10px; background: #201a24; color: var(--z-muted); }
+.z-detail-search-field input { border: 0; background: none; padding: 9px; min-width: 0; }
+.z-details-search>form { display: flex; align-items: center; gap: 6px; }
+.z-details-search>form>label { flex: 1; min-width: 0; }
+.z-search-filters { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 4px; padding: 10px 0; }
+.z-search-filters button { min-height: 34px; flex: none; padding: 6px 8px; font-size: 12px; border: 0; border-radius: 8px; color: var(--z-muted); background: #ffffff05; }
+.z-search-filters button[aria-pressed=true], .z-search-filters .is-active { color: #ffbedf; background: #ff14931b; }
+.z-tool-result { display: grid; gap: 5px; width: 100%; padding: 12px 4px; background: transparent; text-align: left; border: 0; border-bottom: 1px solid #ffffff0c; color: var(--z-text); }
+.z-tool-result small { color: var(--z-muted); font-size: 12px; }
+.z-pin-row { display: flex; align-items: center; gap: 6px; border-bottom: 1px solid #ffffff10; padding-block: 6px; }
+.z-pin-row>button:first-child { flex: 1; min-width: 0; text-align: left; font-size: 14px; padding: 9px 4px; background: transparent; border: 0; }
+.z-pin-row>button:last-child { min-height: 36px; }
+.z-media-center { max-height: none; }
+.z-forward-dialog { width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); margin: auto; padding: 18px; border: 1px solid var(--z-line); border-radius: 14px; background: #211b25; color: var(--z-text); }
+.z-forward-dialog::backdrop { background: #0008; backdrop-filter: blur(6px); }
+.z-forward-dialog>header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.z-forward-dialog>div { display: grid; gap: 4px; margin-top: 8px; }
+.z-forward-dialog>div>button { min-height: 40px; padding: 8px; background: transparent; text-align: left; border-radius: 8px; }
+.z-forward-dialog>div>button:hover { background: #ffffff0b; }
+.z-file-dialog { width: min(420px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: auto; padding: 18px; border: 1px solid var(--z-line); border-radius: 14px; background: #211b25; color: var(--z-text); }
+.z-file-dialog::backdrop { background: #0008; backdrop-filter: blur(6px); }
+.z-file-dialog>header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.z-file-dialog ul { display: grid; gap: 8px; list-style: none; padding: 0; margin: 14px 0; }
+.z-file-dialog li { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; }
+.z-file-dialog li>span { flex: 1; min-width: 0; overflow: hidden; overflow-wrap: anywhere; }
+.z-file-dialog li small { display: block; color: var(--z-muted); font-size: 12px; }
+.z-file-dialog button { box-shadow: none; background-image: none; border: 0; }
+.z-file-dialog li>button { flex: none; min-width: 36px; min-height: 36px; background: transparent; border-radius: 8px; }
+.z-file-dialog .primary { margin-top: 12px; min-height: 40px; border-radius: 10px; }
+.z-file-dialog input { font-size: 16px; padding: 10px; border-radius: 10px; }
+.z-file-dialog .z-icon { width: 36px; height: 36px; background: transparent; }
+.z-file-error { flex-basis: 100%; order: 3; }
+.z-composer:has(.z-file-error) { flex-wrap: wrap; }
+.z-auth-card { border-radius: 18px; background: var(--z-surface); box-shadow: none; }
+.z-auth-card h1 { font-size: 26px; }
+.z-auth-card .primary, .z-auth-card .secondary { min-height: 44px; border: 0; border-radius: 11px; box-shadow: none; background-image: none; backdrop-filter: none; -webkit-backdrop-filter: none; font-size: 14px; }
+.z-auth-card button::before, .z-auth-card button::after { display: none; }
+.z-auth-card input { min-height: 44px; border-radius: 11px; font-size: 16px; padding: 11px 13px; }
+.z-auth-card .z-auth-switch { box-shadow: none; background: transparent; }
+body:has(.z-shell[data-motion=reduced]) .z-action-popup,
+body:has(.z-shell[data-motion=reduced]) .z-contact-dialog.z-peer-panel,
+body:has(.z-shell[data-motion=reduced]) .z-contact-dialog.z-group-profile-dialog { animation: none; transition: none; }
+@media (max-width: 1100px) and (min-width: 721px) {
+  .z-shell, .z-shell.is-compact { grid-template-columns: 70px 290px minmax(0, 1fr); gap: 8px; }
+  .z-sidebar nav button { width: 46px; justify-content: center; padding: 0; }
+}
+@media (min-width: 721px) {
+  .z-shell[data-nav-side=right] { grid-template-columns: 320px minmax(0, 1fr) 210px; }
+  .z-shell[data-nav-side=right].is-compact { grid-template-columns: 320px minmax(0, 1fr) 82px; }
+  .z-shell[data-nav-side=right]>.z-sidebar { grid-column: 3; grid-row: 1; }
+  .z-shell[data-nav-side=right]>.z-dialogs { grid-column: 1; grid-row: 1; }
+  .z-shell[data-nav-side=right]>.z-workspace { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 1100px) {
+  .z-settings-link { justify-content: center; padding: 0; }
+  .z-settings-link>span { display: none; }
+  .z-sidebar-bottom .z-account { justify-content: center; padding-inline: 0; }
+  .z-sidebar-bottom .z-collapse { justify-self: end; }
+}
+@media (min-width: 721px) and (max-width: 1100px) {
+  .z-shell[data-nav-side=right], .z-shell[data-nav-side=right].is-compact { grid-template-columns: 290px minmax(0, 1fr) 70px; }
+}
+@media (max-width: 720px) {
+  .z-shell, .z-shell.is-compact { grid-template-columns: minmax(0, 1fr) 54px; gap: 6px; padding: 4px; }
+  .z-shell>.z-sidebar { grid-column: 2; grid-row: 1; }
+  .z-shell>.z-dialogs { grid-column: 1; grid-row: 1; }
+  .z-shell[data-nav-side=left] { grid-template-columns: 54px minmax(0, 1fr); }
+  .z-shell[data-nav-side=left]>.z-sidebar { grid-column: 1; }
+  .z-shell[data-nav-side=left]>.z-dialogs { grid-column: 2; }
+  .z-shell.has-mobile-chat[data-nav-side] { grid-template-columns: minmax(0, 1fr); }
+  .z-shell.has-mobile-chat>.z-workspace { grid-column: 1; grid-row: 1; }
+  .z-sidebar { padding: 18px 4px 12px; }
+  .z-sidebar nav button, .z-shell.is-compact .z-sidebar nav button { width: 44px; min-height: 46px; }
+  .z-sidebar nav button svg { width: 20px; height: 20px; }
+  .z-dialogs { padding: 14px 8px 0; }
+  .z-shell .z-icon, .z-contact-dialog .z-icon { width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-basis: 44px; }
+  .z-list-top .z-icon { width: 36px; min-width: 36px; height: 44px; flex-basis: 36px; }
+  .z-list-top { gap: 2px; }
+  .z-list-top>div { gap: 0; }
+  .z-list-top>span { font-size: 20px; }
+  .z-search input { font-size: 16px; }
+  .z-dialog-filters { padding-top: 7px; padding-bottom: 9px; }
+  .z-dialog-filters button { min-height: 44px; }
+  .z-shell .z-conversation { min-height: 68px; padding-right: 36px; }
+  .z-action-menu>summary { min-width: 44px; width: 44px; height: 44px; }
+  .z-chat-row-menu { right: 0; top: 13px; }
+  .z-chat-row>.z-conversation { padding-right: 78px; }
+  .z-chat-row>.z-conversation .z-unread { right: 50px; }
+  .z-action-popup { max-width: calc(100vw - 16px); }
+  .z-action-popup>button { min-height: 44px; }
+  .z-action-popup .z-reaction-picker button { min-height: 44px; }
+  .z-shell .z-messages>.z-chat-header { height: 64px; min-height: 64px; flex-basis: 64px; padding: 10px 52px 10px 44px; gap: 4px; }
+  .z-shell .z-messages.z-group-view>.z-chat-header { padding-left: 44px; padding-right: 8px; }
+  .z-shell .z-chat-header>.z-icon { width: 36px; height: 44px; min-width: 36px; flex-basis: 36px; }
+  .z-shell .z-mobile-back { position: absolute; left: 3px; top: 10px; width: 38px; min-width: 38px; }
+  .z-shell .z-call-panel.is-idle:not(.no-peer) { top: 10px; right: 8px; }
+  .z-shell .z-call-panel.is-idle:not(.no-peer) .z-call-launch { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .z-header-profile { gap: 7px; }
+  .z-header-profile .z-avatar { width: 32px; height: 32px; min-width: 32px; }
+  .z-header-profile strong, .z-chat-header h2 { font-size: 15px; }
+  .z-header-profile small, .z-chat-header p { font-size: 12px; }
+  .z-pinned-bar { padding-inline: 10px; min-height: 44px; }
+  .z-pinned-bar .z-pin-count { font-size: 0; }
+  .z-pinned-bar .z-pin-count::after { content: 'Все'; font-size: 12px; }
+  .z-shell .z-message-scroll { padding: 16px 12px; }
+  .z-shell .z-bubble { max-width: 90%; }
+  .z-message-menu { top: 0; right: 0; }
+  .z-message-menu>summary { width: 28px; min-width: 28px; height: 36px; }
+  .z-messages>.z-composer-region { padding: 8px 8px max(10px, env(safe-area-inset-bottom)); }
+  .z-composer { gap: 3px; }
+  .z-composer-field { padding-inline: 9px; }
+  .z-composer-field textarea { font-size: 16px; }
+  .z-composer .z-send { width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-basis: 44px; }
+  .z-shell .z-settings { padding: 64px 16px 24px; max-width: none; }
+  .z-setting-row select { max-width: 48%; }
+  .z-contact-dialog.z-peer-panel, .z-contact-dialog.z-group-profile-dialog { width: 100vw; height: 100dvh; inset: 0; border: 0; border-radius: 0; padding: 16px; }
+  .z-details-tabs button { min-height: 44px; }
+}
+@media (max-width: 380px) {
+  .z-list-top .z-icon { width: 32px; min-width: 32px; flex-basis: 32px; }
+  .z-setting-row { flex-wrap: wrap; }
+  .z-setting-row select { max-width: none; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .z-action-popup, .z-contact-dialog.z-peer-panel, .z-contact-dialog.z-group-profile-dialog { animation: none; }
+}
+/* Outer-edge collapse control, mirrored for the right-hand rail. */
+.z-shell[data-nav-side=right] .z-collapse svg { transform: rotate(180deg); }
+.z-shell[data-nav-side=right].is-compact .z-collapse svg { transform: rotate(0deg); }
+/* Compact shared footer keeps reactions and time on one line. */
+.z-message-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.z-message-footer>.z-message-meta { order: 2; flex: 1 0 auto; width: auto; margin: 0; align-self: center; }
+.z-message-footer .z-reaction-list { order: 1; margin: 0; flex-wrap: wrap; }
+.z-message-footer .z-edit-message, .z-message-footer .z-feature-error { order: 3; flex: 0 0 100%; }
+/* Soft glass controls around a dark pill-shaped message field. */
+.z-shell .z-composer { gap: 10px; }
+.z-shell .z-composer-field { min-height: 52px; border-radius: 28px; padding: 3px 17px; border: 1px solid #b7ff3945; background: linear-gradient(125deg,#27232bba,#131217d9); backdrop-filter: blur(22px) saturate(135%); -webkit-backdrop-filter: blur(22px) saturate(135%); box-shadow: inset 0 1px 0 #ffffff0b, 0 0 0 3px #b7ff3905; }
+.z-shell .z-composer-field:focus-within { border-color: #b7ff3980; box-shadow: 0 0 0 3px #b7ff390b; }
+.z-shell .z-composer-field textarea { min-height: 42px; padding-block: 9px; font-size: 16px; background: transparent; }
+.z-shell .z-composer .z-attachments-menu>summary,
+.z-shell .z-composer .z-voice-composer .z-icon { width: 48px; height: 48px; min-width: 48px; min-height: 48px; flex: 0 0 48px; padding: 0; border: 1px solid #ffffff2b; border-radius: 17px; background: linear-gradient(145deg,#ffffff24,#ffffff05 45%,#ff149311); box-shadow: inset 0 1px 0 #ffffff40; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); color: #eee5f0; }
+.z-shell .z-composer .z-attachments-menu>summary { border-radius: 50%; }
+.z-shell .z-composer .z-attachments-menu>summary svg { width: 24px; height: 24px; }
+.z-shell .z-composer .z-send { width: 50px; height: 50px; min-width: 50px; min-height: 50px; flex: 0 0 50px; border-radius: 50%; background: var(--z-lime); }
+.z-shell .z-composer .z-send svg { width: 23px; height: 23px; }
+/* Small movement for controls and menus without moving surrounding content. */
+.z-message-menu>summary svg { transition: transform 240ms cubic-bezier(.2,.7,.2,1); }
+.z-message-menu>summary[aria-expanded=true] svg { transform: rotate(180deg); }
+.z-action-popup { animation: z-menu-soft-in 180ms cubic-bezier(.2,.7,.2,1) both; transform-origin: top right; }
+.z-shell .z-composer-field { transition: border-color 220ms ease, box-shadow 220ms ease; }
+.z-shell .z-composer button, .z-shell .z-composer summary { transition: background-color 180ms ease, box-shadow 180ms ease, scale 180ms ease; }
+.z-shell .z-composer button:active:not(:disabled), .z-shell .z-composer summary:active { scale: .96; }
+.z-sidebar nav button, .z-settings-link, .z-conversation { transition: background-color 200ms ease, color 200ms ease; }
+@keyframes z-menu-soft-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@media (max-width: 720px) {
+ .z-shell .z-composer { gap: 6px; }
+ .z-shell .z-composer .z-attachments-menu>summary,
+ .z-shell .z-composer .z-voice-composer .z-icon,
+ .z-shell .z-composer .z-send { width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-basis: 44px; }
+ .z-shell .z-composer-field { min-height: 46px; padding: 1px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .z-action-popup { animation: none; }
+ .z-message-menu>summary svg, .z-shell .z-composer-field, .z-shell .z-composer button, .z-shell .z-composer summary { transition: none; }
+ .z-shell .z-composer button:active:not(:disabled), .z-shell .z-composer summary:active { scale: 1; }
+}
+body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
+.z-shell[data-motion=reduced] .z-message-menu>summary svg, .z-shell[data-motion=reduced] .z-composer-field,
+.z-shell[data-motion=reduced] .z-composer button, .z-shell[data-motion=reduced] .z-composer summary { transition: none; }
+.z-shell[data-motion=reduced] .z-composer button:active:not(:disabled), .z-shell[data-motion=reduced] .z-composer summary:active { scale: 1; }
+.z-saved-accounts { display: flex; flex-wrap: wrap; gap: 7px; }
+.z-saved-accounts button { min-height: 34px; font-size: 12px; overflow-wrap: anywhere; }
+.z-remember-account { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 9px !important; color: var(--z-muted); font-size: 13px !important; font-weight: 400 !important; }
+.z-remember-account input { width: 17px; height: 17px; min-height: 17px; accent-color: var(--z-lime); }
+.z-account-switch { display: flex; justify-content: space-between; width: 100%; margin-block: 5px; overflow-wrap: anywhere; }

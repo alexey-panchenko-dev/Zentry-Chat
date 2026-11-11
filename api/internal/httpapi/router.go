@@ -14,7 +14,7 @@ import (
 func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler {
 	mux := http.NewServeMux()
 	registerDocs(mux)
-	h := &authHandlers{service: auth.New(db)}
+	h := &authHandlers{service: auth.New(db), mailer: newSMTPMailer()}
 	var publisher realtime.Publisher = &realtime.Client{}
 	if len(publishers) > 0 {
 		publisher = publishers[0]
@@ -101,6 +101,10 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	}
 	authMux := http.NewServeMux()
 	authMux.HandleFunc("POST /api/auth/register", h.register)
+	authMux.HandleFunc("POST /api/auth/verify-email", h.verifyEmail)
+	authMux.HandleFunc("POST /api/auth/resend-verification", h.resendVerification)
+	authMux.HandleFunc("POST /api/auth/password-reset/request", h.requestPasswordReset)
+	authMux.HandleFunc("POST /api/auth/password-reset/confirm", h.resetPassword)
 	authMux.HandleFunc("POST /api/auth/login", h.login)
 	authMux.HandleFunc("POST /api/auth/logout", h.logout)
 	authMux.HandleFunc("GET /api/auth/me", h.me)

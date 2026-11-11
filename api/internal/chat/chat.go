@@ -63,7 +63,7 @@ func New(db *pgxpool.Pool) *Store { return &Store{db: db} }
 
 func (s *Store) SearchUsers(ctx context.Context, userID, query string) ([]PublicUser, error) {
 	rows, err := s.db.Query(ctx, `SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users
-		WHERE id<>$1 AND (strpos(lower(name),lower(trim(leading '@' from $2)))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
+		WHERE email_verified=true AND id<>$1 AND (strpos(lower(name),lower(trim(leading '@' from $2)))>0 OR email=lower($2) OR username=lower(trim(leading '@' from $2)))
         ORDER BY lower(name),id LIMIT 20`, userID, query)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (s *Store) CreateConversation(ctx context.Context, userID, peerID string) (
 		return Conversation{}, err
 	}
 	var peer PublicUser
-	err = tx.QueryRow(ctx, "SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE id=$1 FOR KEY SHARE", peerID).Scan(&peer.ID, &peer.Name, &peer.Username, &peer.AvatarURL)
+	err = tx.QueryRow(ctx, "SELECT id::text,name,username,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),'') FROM users WHERE id=$1 AND email_verified=true FOR KEY SHARE", peerID).Scan(&peer.ID, &peer.Name, &peer.Username, &peer.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Conversation{}, ErrNotFound
 	}

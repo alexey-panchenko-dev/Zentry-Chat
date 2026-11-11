@@ -42,7 +42,7 @@ type GroupMessage struct {
 }
 
 func (s *Store) GroupContacts(ctx context.Context, user string) ([]PublicUser, error) {
-	rows, err := s.db.Query(ctx, `SELECT u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'') FROM conversations c JOIN conversation_members me ON me.conversation_id=c.id AND me.user_id=$1 JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END WHERE NOT me.hidden AND NOT EXISTS(SELECT 1 FROM contact_blocks b WHERE (b.blocker_id=$1 AND b.blocked_id=u.id) OR (b.blocked_id=$1 AND b.blocker_id=u.id)) ORDER BY u.name,u.id LIMIT 500`, user)
+	rows, err := s.db.Query(ctx, `SELECT u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'') FROM conversations c JOIN conversation_members me ON me.conversation_id=c.id AND me.user_id=$1 JOIN users u ON u.id=CASE WHEN c.user_low=$1 THEN c.user_high ELSE c.user_low END WHERE u.email_verified=true AND NOT me.hidden AND NOT EXISTS(SELECT 1 FROM contact_blocks b WHERE (b.blocker_id=$1 AND b.blocked_id=u.id) OR (b.blocked_id=$1 AND b.blocker_id=u.id)) ORDER BY u.name,u.id LIMIT 500`, user)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (s *Store) CreateGroup(ctx context.Context, owner, name string, peers []str
 	}
 	defer tx.Rollback(context.Background())
 	var count int
-	err = tx.QueryRow(ctx, `SELECT count(DISTINCT u.id) FROM users u JOIN conversations c ON c.user_low=LEAST($1::uuid,u.id) AND c.user_high=GREATEST($1::uuid,u.id) JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=$1 WHERE u.id=ANY($2::uuid[]) AND u.id<>$1 AND NOT cm.hidden AND NOT EXISTS(SELECT 1 FROM contact_blocks b WHERE (b.blocker_id=$1 AND b.blocked_id=u.id) OR (b.blocked_id=$1 AND b.blocker_id=u.id))`, owner, peers).Scan(&count)
+	err = tx.QueryRow(ctx, `SELECT count(DISTINCT u.id) FROM users u JOIN conversations c ON c.user_low=LEAST($1::uuid,u.id) AND c.user_high=GREATEST($1::uuid,u.id) JOIN conversation_members cm ON cm.conversation_id=c.id AND cm.user_id=$1 WHERE u.email_verified=true AND u.id=ANY($2::uuid[]) AND u.id<>$1 AND NOT cm.hidden AND NOT EXISTS(SELECT 1 FROM contact_blocks b WHERE (b.blocker_id=$1 AND b.blocked_id=u.id) OR (b.blocked_id=$1 AND b.blocker_id=u.id))`, owner, peers).Scan(&count)
 	if err != nil {
 		return Group{}, nil, err
 	}

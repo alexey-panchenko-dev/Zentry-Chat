@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 import { Plus, Send, X } from 'lucide-react'
 import { api, errorText } from '@/api'
 import type { Message } from '@/api'
@@ -6,12 +7,13 @@ import { ImageDraftController } from './image-draft'
 import type { ImageDraftState } from './image-draft'
 import { prepareChatPhoto } from './profile-photo'
 type UploadResult={message:Message;realtime:string}
-export function ImageComposer({conversationID,groupID,disabled,onSent,onActiveChange}:{conversationID?:string;groupID?:string;disabled:boolean;onSent:(result:UploadResult)=>void;onActiveChange:(active:boolean)=>void}) {
+export function ImageComposer({conversationID,groupID,disabled,onSent,onActiveChange,pickerRef,hideTrigger=false}:{conversationID?:string;groupID?:string;disabled:boolean;onSent:(result:UploadResult)=>void;onActiveChange:(active:boolean)=>void;pickerRef?:RefObject<HTMLInputElement|null>;hideTrigger?:boolean}) {
  const [state,setState]=useState<ImageDraftState>({phase:'idle'})
  const [caption,setCaption]=useState('')
  const captionRef=useRef('')
  const root=useRef<HTMLDivElement>(null)
  const input=useRef<HTMLInputElement>(null)
+ useImperativeHandle(pickerRef,()=>input.current!,[])
  const controller=useRef<ImageDraftController<UploadResult>|null>(null)
  const sent=useRef(onSent)
  useEffect(()=>{sent.current=onSent},[onSent])
@@ -45,7 +47,7 @@ export function ImageComposer({conversationID,groupID,disabled,onSent,onActiveCh
  const pending=state.phase==='sending'
  return <div ref={root} className="z-image-composer" data-active={active} data-error={!!state.error}>
  <input ref={input} hidden type="file" accept="image/jpeg,image/png" aria-label="Выбрать фото для сообщения" disabled={disabled||pending} onChange={event=>{const file=event.target.files?.[0];event.target.value='';if(file&&!disabled)void controller.current?.select(file)}}/>
- {!active&&<button type="button" className="z-icon z-attach-photo" aria-label="Добавить фото" title="Добавить JPG или PNG до 15 МБ" disabled={disabled} onClick={()=>input.current?.click()}><Plus size={24}/></button>}
+ {!active&&!hideTrigger&&<button type="button" className="z-icon z-attach-photo" aria-label="Добавить фото" title="Добавить JPG или PNG до 15 МБ" disabled={disabled} onClick={()=>input.current?.click()}><Plus size={20}/></button>}
  {state.phase==='preparing'&&<><span role="status">Подготавливаем фото…</span><button type="button" className="z-icon" aria-label="Отменить фото" onClick={()=>controller.current?.cancel()}><X/></button></>}
  {state.draft&&<><img className="z-chat-photo-preview" src={state.draft.url} alt="Предпросмотр фото перед отправкой"/><textarea className="z-image-caption-input" aria-label="Подпись к фото" placeholder="Подпись к фото…" rows={2} maxLength={1000} disabled={pending||disabled||!!state.error} value={caption} onChange={event=>{setCaption(event.target.value);captionRef.current=event.target.value}}/><div className="z-image-draft-actions"><button type="button" className="z-icon" aria-label={pending?'Отменить отправку фото':'Убрать фото'} onClick={()=>{controller.current?.cancel();setCaption('');captionRef.current=''}}><X/></button><button type="button" className="z-send" disabled={pending||disabled} aria-label={state.error?'Повторить отправку фото':'Отправить фото'} onClick={()=>{if(!disabled)void controller.current?.send()}}><Send size={20}/></button></div>{pending&&<span role="status">Отправляем фото…</span>}</>}
  {state.error&&<p className="notice" role="alert">{state.error}</p>}

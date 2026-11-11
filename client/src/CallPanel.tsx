@@ -36,7 +36,7 @@ function VideoStream({ stream, muted = false, label, user }: { stream: MediaStre
     </div>
   </div>
 }
-export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange, requestCall, contactBlocked=false }: { contactBlocked?:boolean; requestCall?:ProfileCallRequest|null; onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
+export function CallPanel({ user, selected, conversations = [], soundsEnabled = true, onActiveChange, requestCall, contactBlocked=false, showLaunch=true }: { showLaunch?:boolean; contactBlocked?:boolean; requestCall?:ProfileCallRequest|null; onActiveChange?:(active:boolean)=>void; user: User; selected: Conversation | null; conversations?: Conversation[]; soundsEnabled?:boolean }) {
   const callDialog = useRef<HTMLDialogElement>(null)
   const [sounds] = useState(()=>new CallSounds({enabled:soundsEnabled}))
   const [soundBlocked,setSoundBlocked] = useState(false)
@@ -71,7 +71,7 @@ export function CallPanel({ user, selected, conversations = [], soundsEnabled = 
   useEffect(() => { const dialog=callDialog.current; if(ongoing && dialog && !dialog.open)dialog.showModal(); if(!ongoing && dialog?.open)dialog.close() },[ongoing])
   const names: Record<string, string> = { ringing: incoming ? 'Входящий звонок' : 'Вызываем собеседника…', accepted: 'Звонок', ended: 'Звонок завершён', cancelled: 'Вызов отменён', rejected: 'Вызов отклонён', expired: 'Время звонка истекло' }
   return <section className={'z-call-panel '+(ongoing?'is-ongoing':'is-idle')+(!selected&&!ongoing?' no-peer':'')} aria-label="Звонки">
-    {!ongoing && <><button className="z-call-launch z-icon" title={selected?'Позвонить: '+selected.participant.name:'Выберите переписку'} aria-label="Позвонить" disabled={!selected||view.busy||contactBlocked} onClick={()=>selected&&void controller.current?.start(selected.id)}><Phone size={18}/></button>{view.error&&<p className="notice z-call-idle-error" role="alert">{view.error}</p>}</>}
+    {!ongoing && showLaunch && <><button className="z-call-launch z-icon" title={selected?'Позвонить: '+selected.participant.name:'Выберите переписку'} aria-label="Позвонить" disabled={!selected||view.busy||contactBlocked} onClick={()=>selected&&void controller.current?.start(selected.id)}><Phone size={18}/></button>{view.error&&<p className="notice z-call-idle-error" role="alert">{view.error}</p>}</>}
     {ongoing&&<dialog className="z-call-dialog" aria-label="Звонок" ref={callDialog} onCancel={e=>e.preventDefault()}><div className="z-call-stage"><div className="z-call-top"><Avatar user={callPeer||{id:'caller',name:incoming?'Входящий звонок':user.name}}/><div><h2>{call?names[call.status]??call.status:'Звонок'}</h2><p role="status">{view.connection}</p></div></div>
       <div className="z-call-feedback">
       {view.error&&<p className="notice" role="alert">{view.error}</p>}

@@ -53,10 +53,18 @@ export function useComposerHeight(body: string) {
       input.style.height = 'auto'
       input.style.height = Math.min(input.scrollHeight, 132) + 'px'
     }
-    const observer = new ResizeObserver(resize)
+    let width = 0
+    let frame = 0
+    const observer = new ResizeObserver(entries => {
+      const nextWidth = entries[0]?.borderBoxSize?.[0]?.inlineSize ?? entries[0]?.contentRect.width ?? 0
+      if (Math.abs(nextWidth - width) < 1) return
+      width = nextWidth
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(resize)
+    })
     if (input.parentElement) observer.observe(input.parentElement, { box: 'border-box' })
     resize()
-    return () => observer.disconnect()
+    return () => { observer.disconnect(); window.cancelAnimationFrame(frame) }
   }, [body])
   return ref
 }
@@ -69,6 +77,11 @@ export function useMessageGesture<T>(onReply: (message: T) => void) {
   }
   useLayoutEffect(() => cancel, [])
   return (message: T) => ({
+    onContextMenu(event: React.MouseEvent<HTMLDivElement>) {
+      if ((event.target as Element).closest('input,textarea,a,video,audio')) return
+      const menu = event.currentTarget.querySelector<HTMLDetailsElement>('.z-message-menu')
+      if (menu) { event.preventDefault(); menu.open = true }
+    },
     onPointerDown(event: TouchEvent<HTMLDivElement>) {
       if (event.pointerType !== 'touch' || !event.isPrimary || (event.target as Element).closest('button,a,video,audio,input,textarea,summary,.z-message-menu-items')) return
       cancel()
