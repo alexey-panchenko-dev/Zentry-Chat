@@ -5,6 +5,10 @@ import { countryForCode, countryForPhone, formatPhoneInput, phoneCountries } fro
 export function PhoneNumberField({value,onChange,disabled=false,inputRef,invalid=false,describedBy}:{value:string;onChange:(value:string)=>void;disabled?:boolean;inputRef?:Ref<HTMLInputElement>;invalid?:boolean;describedBy?:string}){
  const [countryID,setCountryID]=useState(()=>countryForPhone(value).id)
  const country=countryForCode(countryID)
+ const prefix=country.code.replace(/\D/g,'')
+ const digits=value.replace(/\D/g,'')
+ const national=value.trim().startsWith('+')&&digits.startsWith(prefix)?digits.slice(prefix.length):digits
+ const nationalLimit=country.code==='+7'||country.code==='+1'?10:country.code==='+380'||country.code==='+420'?9:15-prefix.length
  function chooseCountry(id:string){
   const next=countryForCode(id)
   const digits=value.replace(/\D/g,'')
@@ -18,7 +22,7 @@ export function PhoneNumberField({value,onChange,disabled=false,inputRef,invalid
    const detected=countryForPhone(raw)
    setCountryID(detected.id)
    onChange(formatPhoneInput(raw,detected.code))
-  }else onChange(formatPhoneInput(raw,country.code))
+  }else onChange(formatPhoneInput(raw.replace(/\D/g,'').slice(0,nationalLimit),country.code))
  }
- return <div className="z-phone-control"><select aria-label="Страна и телефонный код" value={countryID} disabled={disabled} onChange={event=>chooseCountry(event.target.value)}>{phoneCountries.map(item=><option key={item.id} value={item.id}>{item.label} ({item.code})</option>)}</select><input ref={inputRef} type="tel" inputMode="tel" autoComplete="tel" placeholder={`${country.code} 777 777 7777`} maxLength={24} value={value} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy} onChange={event=>edit(event.target.value)}/></div>
+ return <div className="z-phone-control"><select aria-label="Страна и телефонный код" value={countryID} disabled={disabled} onChange={event=>chooseCountry(event.target.value)}>{phoneCountries.map(item=><option key={item.id} value={item.id}>{item.label} ({item.code})</option>)}</select><input ref={inputRef} type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="777 777 7777" maxLength={nationalLimit+4} value={formatPhoneInput(national,country.code).slice(country.code.length).trim()} disabled={disabled} aria-invalid={invalid} aria-describedby={describedBy} onChange={event=>edit(event.target.value)}/></div>
 }
