@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -56,12 +57,85 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (U
 	return s.RegisterWithBirthDate(ctx, name, email, password, nil)
 }
 func (s *Service) RegisterWithBirthDate(ctx context.Context, name, email, password string, birthDate *string, handle ...string) (User, error) {
-	return s.register(ctx, name, email, password, birthDate, true, handle...)
+	return s.register(ctx, name, email, password, birthDate, handle...)
 }
 func (s *Service) RegisterPendingWithBirthDate(ctx context.Context, name, email, password string, birthDate *string, handle ...string) (User, error) {
-	return s.register(ctx, name, email, password, birthDate, false, handle...)
+	return s.stageRegistration(ctx, name, email, password, birthDate, handle...)
 }
-func (s *Service) register(ctx context.Context, name, email, password string, birthDate *string, verified bool, handle ...string) (User, error) {
+
+var ErrRegistrationPending = errors.New("registration pending")
+
+func (s *Service) stageRegistration(ctx context.Context, name, email, password string, birthDate *string, handle ...string) (User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	name = strings.TrimSpace(name)
+	username := name
+	if len(handle) > 0 {
+		username = strings.ToLower(strings.TrimSpace(handle[0]))
+	}
+	var date any
+	if birthDate != nil {
+		parsed, err := ParseBirthDate(*birthDate, time.Now())
+		if err != nil {
+			return User{}, err
+		}
+		date = parsed
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return User{}, err
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return User{}, err
+	}
+	defer tx.Rollback(context.Background())
+	if _, err = tx.Exec(ctx, `DELETE FROM pending_registrations WHERE expires_at <= now()`); err != nil {
+		return User{}, err
+	}
+	var exists bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1)`, email).Scan(&exists); err != nil {
+		return User{}, err
+	}
+	if exists {
+		return User{}, ErrEmailExists
+	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE username=$1)`, username).Scan(&exists); err != nil {
+		return User{}, err
+	}
+	if exists {
+		return User{}, ErrUsernameExists
+	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pending_registrations WHERE email=$1)`, email).Scan(&exists); err != nil {
+		return User{}, err
+	}
+	if exists {
+		return User{}, ErrRegistrationPending
+	}
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pending_registrations WHERE username=$1 AND email<>$2)`, username, email).Scan(&exists); err != nil {
+		return User{}, err
+	}
+	if exists {
+		return User{}, ErrUsernameExists
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO pending_registrations(name,username,email,password_hash,birth_date,expires_at)
+		VALUES($1,$2,$3,$4,$5,now()+($6 * interval '1 second'))`, name, username, email, string(hash), date, int(EmailCodeTTL/time.Second))
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			if strings.Contains(pgErr.ConstraintName, "username") {
+				return User{}, ErrUsernameExists
+			}
+			return User{}, ErrEmailExists
+		}
+		return User{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return User{}, err
+	}
+	return User{Name: name, Username: username, Email: email}, nil
+}
+
+func (s *Service) register(ctx context.Context, name, email, password string, birthDate *string, handle ...string) (User, error) {
 	var date any
 	if birthDate != nil {
 		d, err := ParseBirthDate(*birthDate, time.Now())
@@ -81,11 +155,11 @@ func (s *Service) register(ctx context.Context, name, email, password string, bi
 	}
 	var u User
 	if len(handle) > 0 {
-		err = tx.QueryRow(ctx, `INSERT INTO users (name,username,email,password_hash,email_verified) VALUES ($1,$1,$2,$3,$4)
-			RETURNING id::text,name,username,email,created_at`, handle[0], email, string(hash), verified).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
+		err = tx.QueryRow(ctx, `INSERT INTO users (name,username,email,password_hash,email_verified) VALUES ($1,$1,$2,$3,true)
+			RETURNING id::text,name,username,email,created_at`, handle[0], email, string(hash)).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
 	} else {
-		err = tx.QueryRow(ctx, `INSERT INTO users (name,email,password_hash,email_verified) VALUES ($1,$2,$3,$4)
-			RETURNING id::text,name,username,email,created_at`, name, email, string(hash), verified).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
+		err = tx.QueryRow(ctx, `INSERT INTO users (name,email,password_hash,email_verified) VALUES ($1,$2,$3,true)
+			RETURNING id::text,name,username,email,created_at`, name, email, string(hash)).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt)
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -123,7 +197,9 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 		return User{}, "", time.Time{}, ErrLoginLocked
 	}
 	if err == nil {
-		if _, err := tx.Exec(ctx, `DELETE FROM auth_login_limits WHERE email=$1`, email); err != nil {
+		// Preserve failed attempts that have not reached a lock. Only an expired
+		// lock starts a fresh attempt window.
+		if _, err := tx.Exec(ctx, `DELETE FROM auth_login_limits WHERE email=$1 AND locked_until <= now()`, email); err != nil {
 			return User{}, "", time.Time{}, err
 		}
 	}
@@ -141,7 +217,9 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 		if err := tx.Commit(ctx); err != nil {
 			return User{}, "", time.Time{}, err
 		}
-		if locked { return User{}, "", time.Time{}, ErrLoginLocked }
+		if locked {
+			return User{}, "", time.Time{}, ErrLoginLocked
+		}
 		return User{}, "", time.Time{}, ErrCredentials
 	}
 	if err != nil {
@@ -155,7 +233,9 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 		if err := tx.Commit(ctx); err != nil {
 			return User{}, "", time.Time{}, err
 		}
-		if locked { return User{}, "", time.Time{}, ErrLoginLocked }
+		if locked {
+			return User{}, "", time.Time{}, ErrLoginLocked
+		}
 		return User{}, "", time.Time{}, ErrCredentials
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM auth_login_limits WHERE email=$1`, email); err != nil {

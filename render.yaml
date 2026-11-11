@@ -23,15 +23,11 @@ services:
         sync: false
       - key: PUSHER_CLUSTER
         sync: false
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USERNAME
+      - key: BREVO_API_KEY
         sync: false
-      - key: SMTP_PASSWORD
+      - key: BREVO_FROM_EMAIL
         sync: false
-      - key: SMTP_FROM
-        sync: false
+      - key: BREVO_FROM_NAME
+        value: Zently
       - key: SITE_URL
         sync: false

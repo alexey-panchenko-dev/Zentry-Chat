@@ -31,7 +31,8 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 	}
 	svc := auth.New(db)
 	store := chat.New(db)
-	server := httptest.NewServer(newRouter(db, &testPublisher{}))
+	mailer := &recordingMailer{}
+	server := httptest.NewServer(newRouterWithMailer(db, mailer, &testPublisher{}))
 	defer server.Close()
 	ids := []string{}
 	defer func() {
@@ -61,7 +62,10 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 		return string(raw)
 	}
 	email := fmt.Sprintf("birthday-%d@example.com", time.Now().UnixNano())
-	raw := request("", "POST", "/api/auth/register", fmt.Sprintf(`{"name":"DOB","email":%q,"password":"password-12345","birth_date":"2000-02-29"}`, email), 201)
+	raw := request("", "POST", "/api/auth/register", fmt.Sprintf(`{"name":"DOB","email":%q,"password":"Strong1&","birth_date":"2000-02-29"}`, email), 202)
+	code := mailer.code(email, auth.VerificationPurpose)
+	request("", "POST", "/api/auth/verify-email", fmt.Sprintf(`{"email":%q,"code":%q}`, email, code), 200)
+	raw = request("", "POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"Strong1&"}`, email), 200)
 	var registered struct {
 		User auth.User `json:"user"`
 	}
@@ -72,7 +76,7 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 	if strings.Contains(raw, "birth_date") {
 		t.Fatal("auth leaked DOB")
 	}
-	_, token, _, err := svc.Login(ctx, email, "password-12345")
+	_, token, _, err := svc.Login(ctx, email, "Strong1&")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +98,7 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 	}
 	for _, date := range []string{"1900-02-29", "2099-01-01", "2024-02-30", ""} {
 		request(token, "PUT", "/api/profile", fmt.Sprintf(`{"name":"DOB","birth_date":%q}`, date), 400)
-		request("", "POST", "/api/auth/register", fmt.Sprintf(`{"name":"DOB","email":%q,"password":"password-12345","birth_date":%q}`, fmt.Sprintf("invalid-birth-%d@example.com", time.Now().UnixNano()), date), 400)
+		request("", "POST", "/api/auth/register", fmt.Sprintf(`{"name":"DOB","email":%q,"password":"Strong1&","birth_date":%q}`, fmt.Sprintf("invalid-birth-%d@example.com", time.Now().UnixNano()), date), 400)
 	}
 	// A stored date takes precedence even if a cached client submits a stale manual age.
 	for _, expression := range []string{"CURRENT_DATE - interval '25 years'", "CURRENT_DATE - interval '25 years' + interval '1 day'", "CURRENT_DATE - interval '25 years' - interval '1 day'"} {
@@ -115,7 +119,7 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 	if _, err = store.UpdateProfileWithBirthDate(ctx, registered.User.ID, "DOB", nil, "hello", "", &leap); err != nil {
 		t.Fatal(err)
 	}
-	peer, err := svc.Register(ctx, "Legacy", fmt.Sprintf("birthday-peer-%d@example.com", time.Now().UnixNano()), "password-12345")
+	peer, err := svc.Register(ctx, "Legacy", fmt.Sprintf("birthday-peer-%d@example.com", time.Now().UnixNano()), "Strong1&")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,4 +153,3 @@ func TestBirthDatesOwnerAndPeerPrivacy(t *testing.T) {
 		t.Fatalf("legacy %+v %v", legacy, err)
 	}
 }
-

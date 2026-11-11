@@ -1,5 +1,6 @@
-import Pusher from 'pusher-js'
+import type Pusher from 'pusher-js'
 import { api, errorText } from '@/api'
+import { getRealtimeConfig } from './realtime-config.ts'
 
 type Hub = {
   users: number; client?: Pusher; connecting: boolean; lastAttempt: number
@@ -13,9 +14,11 @@ async function connect(current: Hub) {
   current.connecting = true
   current.lastAttempt = Date.now()
   try {
-    const { data } = await api.get<{ enabled: boolean; key: string; cluster: string }>('/realtime/config')
+    const data = await getRealtimeConfig()
     if (!current.users) return
     if (!data.enabled) { for (const listener of current.listeners) listener(); return }
+    const { default: Pusher } = await import('pusher-js')
+    if (!current.users) return
     current.client = new Pusher(data.key, {
       cluster: data.cluster, forceTLS: true,
       channelAuthorization: { customHandler: ({ socketId, channelName }, callback) => {

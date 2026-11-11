@@ -7,6 +7,7 @@ const order: BirthPart[] = ['day', 'month', 'year']
 const labels: Record<BirthPart, string> = { day: 'День', month: 'Месяц', year: 'Год' }
 const widths: Record<BirthPart, number> = { day: 2, month: 2, year: 4 }
 const currentYear = new Date().getFullYear()
+const maximumBirthYear = currentYear - 14
 
 type WheelDrag = { part: BirthPart; y: number; remainder: number }
 
@@ -49,12 +50,14 @@ export function BirthDateWheel({ value, onChange, invalid = false, describedBy }
   }
 
   function step(part: BirthPart, direction: 1 | -1) {
-    setPart(part, stepBirthPart(latestParts.current[part], part, direction, currentYear))
+    const next = stepBirthPart(latestParts.current[part], part, direction, currentYear)
+    setPart(part, part === 'year' && Number(next) > maximumBirthYear ? String(maximumBirthYear) : next)
     animate(part, direction)
   }
 
   function type(part: BirthPart, text: string) {
-    const next = limitBirthInput(text, part, currentYear)
+    const limited = limitBirthInput(text, part, currentYear)
+    const next = part === 'year' && limited.length === widths.year && Number(limited) > maximumBirthYear ? String(maximumBirthYear) : limited
     setPart(part, next)
     if (next.length === widths[part]) {
       const index = order.indexOf(part)
@@ -101,7 +104,7 @@ export function BirthDateWheel({ value, onChange, invalid = false, describedBy }
     <input type="hidden" name="birth_date" value={value} />
     {order.map(part => {
       const number = Number(parts[part])
-      const maximum = part === 'day' ? 31 : part === 'month' ? 12 : currentYear
+      const maximum = part === 'day' ? 31 : part === 'month' ? 12 : maximumBirthYear
       const shown = parts[part]
         ? String(number).padStart(widths[part], '0')
         : part === 'year' ? 'ГГГГ' : part === 'day' ? 'ДД' : 'ММ'

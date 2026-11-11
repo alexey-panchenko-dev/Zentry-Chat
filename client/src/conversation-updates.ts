@@ -1,6 +1,6 @@
 import { subscribeRealtime } from './realtime.ts'
 
-export type ConversationUpdate = { conversation_id?: string; reason: 'conversation'|'message'|'discovery'|'read'|'connected'|'group' }
+export type ConversationUpdate = { conversation_id?: string; group_id?: string; reason: 'conversation'|'message'|'discovery'|'read'|'connected'|'group' }
 export function watchConversations(userID: string, refresh: (data: ConversationUpdate) => void, status: (ready: boolean) => void = () => {}) {
   let lastRecovery = 0
   const recover = () => {

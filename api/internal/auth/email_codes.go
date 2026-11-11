@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -29,6 +32,11 @@ func (s *Service) IssueEmailCode(ctx context.Context, email, purpose string) (st
 	if err != nil { return "", err }
 	defer tx.Rollback(context.Background())
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, email+":"+purpose); err != nil { return "", err }
+	if purpose == VerificationPurpose {
+		var pending bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pending_registrations WHERE email=$1 AND expires_at>now())`, email).Scan(&pending); err != nil { return "", err }
+		if !pending { return "", ErrCodeExpired }
+	}
 	var resendAfter time.Time
 	err = tx.QueryRow(ctx, `SELECT resend_after FROM auth_email_codes WHERE email=$1 AND purpose=$2 FOR UPDATE`, email, purpose).Scan(&resendAfter)
 	if err == nil && time.Now().Before(resendAfter) { return "", ErrCodeCooldown }
@@ -42,6 +50,9 @@ func (s *Service) IssueEmailCode(ctx context.Context, email, purpose string) (st
 		VALUES($1,$2,$3,now()+($4 * interval '1 second'),now()+($5 * interval '1 second'),0)
 		ON CONFLICT(email,purpose) DO UPDATE SET code_hash=EXCLUDED.code_hash,expires_at=EXCLUDED.expires_at,resend_after=EXCLUDED.resend_after,attempts=0,created_at=now()`, email, purpose, string(hash), int(EmailCodeTTL/time.Second), int(EmailCodeCooldown/time.Second))
 	if err != nil { return "", err }
+	if purpose == VerificationPurpose {
+		if _, err := tx.Exec(ctx, `UPDATE pending_registrations SET expires_at=now()+($2 * interval '1 second') WHERE email=$1`, email, int(EmailCodeTTL/time.Second)); err != nil { return "", err }
+	}
 	return code, tx.Commit(ctx)
 }
 
@@ -54,15 +65,32 @@ func (s *Service) IssueRecoveryCode(ctx context.Context, email string) (string, 
 
 func (s *Service) IssueVerificationCode(ctx context.Context, email string) (string, bool, error) {
 	var exists bool
-	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE email=$1 AND email_verified=false)`, email).Scan(&exists); err != nil || !exists { return "", exists, err }
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pending_registrations WHERE email=$1 AND expires_at>now())`, email).Scan(&exists); err != nil || !exists { return "", exists, err }
 	code, err := s.IssueEmailCode(ctx, email, VerificationPurpose)
 	return code, true, err
 }
 
 func (s *Service) VerifyEmailCode(ctx context.Context, email, code string) error {
 	return s.consumeEmailCode(ctx, email, VerificationPurpose, code, func(tx pgx.Tx) error {
-		var exists bool
-		if err := tx.QueryRow(ctx, `UPDATE users SET email_verified=true WHERE email=$1 AND email_verified=false RETURNING true`, email).Scan(&exists); errors.Is(err, pgx.ErrNoRows) { return ErrCodeInvalid } else if err != nil { return err }
+		var name, username, passwordHash string
+		var birthDate pgtype.Date
+		err := tx.QueryRow(ctx, `SELECT name,username,password_hash,birth_date FROM pending_registrations WHERE email=$1 AND expires_at>now() FOR UPDATE`, email).Scan(&name, &username, &passwordHash, &birthDate)
+		if errors.Is(err, pgx.ErrNoRows) { return ErrCodeExpired }
+		if err != nil { return err }
+		var userID string
+		err = tx.QueryRow(ctx, `INSERT INTO users(name,username,email,password_hash,email_verified) VALUES($1,$2,$3,$4,true) RETURNING id::text`, name, username, email, passwordHash).Scan(&userID)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				if strings.Contains(pgErr.ConstraintName, "username") { return ErrUsernameExists }
+				return ErrEmailExists
+			}
+			return err
+		}
+		if birthDate.Valid {
+			if _, err := tx.Exec(ctx, `INSERT INTO user_profiles(user_id,birth_date) VALUES($1,$2)`, userID, birthDate.Time); err != nil { return err }
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM pending_registrations WHERE email=$1`, email); err != nil { return err }
 		return nil
 	})
 }

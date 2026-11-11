@@ -16,6 +16,7 @@ func TestRegistrationRejectsInvalidRequests(t *testing.T) {
 		{"unknown field", `{"extra":1}`, "application/json", 400},
 		{"multiple objects", `{} {}`, "application/json", 400},
 		{"short password", `{"name":"Test","email":"test@example.com","password":"short"}`, "application/json", 400},
+		{"missing birthday", `{"name":"Test","email":"test@example.com","password":"Strong1&"}`, "application/json", 400},
 		{"display name email", `{"name":"Test","email":"Name <test@example.com>","password":"long-password-123"}`, "application/json", 400},
 		{"too large", `{"name":"` + strings.Repeat("a", 17000) + `"}`, "application/json", 413},
 	}

@@ -28,6 +28,9 @@ func TestPrivateDeleteAndRemoveContact(t *testing.T) {
 		t.Fatal(err)
 	}
 	offset := len(f.publisher.events)
+	if _, err = f.db.Exec(f.ctx, `INSERT INTO contact_aliases(owner_id,peer_id,alias) VALUES($1,$2,'My contact'),($2,$1,'Their contact')`, f.users[0].ID, f.users[1].ID); err != nil {
+		t.Fatal(err)
+	}
 	removed := f.request(t, 0, "POST", path, `{"action":"remove_contact"}`, 200)
 	if string(removed["hidden"]) != "true" || string(removed["cleared_through"]) != `"0"` {
 		t.Fatalf("remove state%s", removed)
@@ -35,6 +38,13 @@ func TestPrivateDeleteAndRemoveContact(t *testing.T) {
 	state, err := f.store.Controls(f.ctx, f.conv.ID, f.users[0].ID)
 	if err != nil || !state.Hidden {
 		t.Fatalf("hidden state%+v %v", state, err)
+	}
+	var aliasCount int
+	if err = f.db.QueryRow(f.ctx, `SELECT count(*) FROM contact_aliases WHERE owner_id=$1 AND peer_id=$2`, f.users[0].ID, f.users[1].ID).Scan(&aliasCount); err != nil || aliasCount != 0 {
+		t.Fatalf("removed contact alias remained: %d %v", aliasCount, err)
+	}
+	if err = f.db.QueryRow(f.ctx, `SELECT count(*) FROM contact_aliases WHERE owner_id=$1 AND peer_id=$2`, f.users[1].ID, f.users[0].ID).Scan(&aliasCount); err != nil || aliasCount != 1 {
+		t.Fatalf("peer contact alias changed: %d %v", aliasCount, err)
 	}
 	list, err := f.store.Conversations(f.ctx, f.users[0].ID, 0, 20)
 	if err != nil || len(list) != 0 {
@@ -174,15 +184,63 @@ func TestDeleteConversationForEveryoneClearsBothMembers(t *testing.T) {
 	f := newControlFixture(t)
 	for i, member := range f.users[:2] {
 		id := fmt.Sprintf("eaffffff-ffff-4fff-8fff-%012d", i+1)
-		if _, _, err := f.store.Send(f.ctx, f.conv.ID, member.ID, id, "visible before delete"); err != nil { t.Fatal(err) }
+		if _, _, err := f.store.Send(f.ctx, f.conv.ID, member.ID, id, "visible before delete"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	path := "/api/conversations/"+f.conv.ID+"/controls"
-	f.request(t,0,"POST",path,`{"action":"delete_everyone"}`,200)
+	path := "/api/conversations/" + f.conv.ID + "/controls"
+	f.request(t, 2, "POST", path, `{"action":"delete_everyone"}`, 404)
+	offset := len(f.publisher.events)
+	result := f.request(t, 0, "POST", path, `{"action":"delete_everyone"}`, 200)
+	if string(result["hidden"]) != "true" {
+		t.Fatalf("delete was not confirmed: %s", result)
+	}
 	for _, member := range f.users[:2] {
-		state, err := f.store.Controls(f.ctx,f.conv.ID,member.ID)
-		if err != nil { t.Fatal(err) }
-		if state.Hidden || state.ClearedThrough=="0" { t.Fatalf("member did not retain a visible empty chat: %+v",state) }
-		history, err := f.store.Messages(f.ctx,f.conv.ID,member.ID,0,20)
-		if err != nil || len(history)!=0 { t.Fatalf("deleted history remained for member: %v %v",history,err) }
+		state, err := f.store.Controls(f.ctx, f.conv.ID, member.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !state.Hidden || state.ClearedThrough == "0" {
+			t.Fatalf("member retained a deleted chat: %+v", state)
+		}
+		history, err := f.store.Messages(f.ctx, f.conv.ID, member.ID, 0, 20)
+		if err != nil || len(history) != 0 {
+			t.Fatalf("deleted history remained for member: %v %v", history, err)
+		}
+		list, err := f.store.Conversations(f.ctx, member.ID, 0, 20)
+		if err != nil || len(list) != 0 {
+			t.Fatalf("deleted chat remained in list: %v %v", list, err)
+		}
+		unread, err := f.store.UnreadChats(f.ctx, member.ID)
+		if err != nil || unread != 0 {
+			t.Fatalf("deleted chat remained unread: %d %v", unread, err)
+		}
+	}
+	if len(f.publisher.events[offset:]) != 2 {
+		t.Fatal("both participants must be notified")
+	}
+	for i, event := range f.publisher.events[offset:] {
+		if event.channel != "private-user-"+f.users[i].ID || event.event != "conversation.updated" {
+			t.Fatalf("incorrect deletion event: %+v", event)
+		}
+	}
+	// A lost-response retry cannot resurrect old history or reopen either list.
+	_, _, err := f.store.Send(f.ctx, f.conv.ID, f.users[0].ID, "eaffffff-ffff-4fff-8fff-000000000001", "visible before delete")
+	if !errors.Is(err, chat.ErrNotFound) {
+		t.Fatalf("old retry returned cleared message: %v", err)
+	}
+	fresh, _, err := f.store.Send(f.ctx, f.conv.ID, f.users[1].ID, "eaffffff-ffff-4fff-8fff-000000000003", "new conversation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, member := range f.users[:2] {
+		list, err := f.store.Conversations(f.ctx, member.ID, 0, 20)
+		if err != nil || len(list) != 1 {
+			t.Fatalf("fresh message did not reopen chat: %v %v", list, err)
+		}
+		history, err := f.store.Messages(f.ctx, f.conv.ID, member.ID, 0, 20)
+		if err != nil || len(history) != 1 || history[0].ID != fresh.ID {
+			t.Fatalf("cleared history reappeared: %v %v", history, err)
+		}
 	}
 }

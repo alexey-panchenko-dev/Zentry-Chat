@@ -12,9 +12,13 @@ import (
 )
 
 func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler {
+	return newRouterWithMailer(db, newTransactionalMailer(), publishers...)
+}
+
+func newRouterWithMailer(db *pgxpool.Pool, mailer codeMailer, publishers ...realtime.Publisher) http.Handler {
 	mux := http.NewServeMux()
 	registerDocs(mux)
-	h := &authHandlers{service: auth.New(db), mailer: newSMTPMailer()}
+	h := &authHandlers{service: auth.New(db), mailer: mailer}
 	var publisher realtime.Publisher = &realtime.Client{}
 	if len(publishers) > 0 {
 		publisher = publishers[0]
@@ -95,7 +99,7 @@ func newRouter(db *pgxpool.Pool, publishers ...realtime.Publisher) http.Handler 
 	chatMux.HandleFunc("POST /api/conversations/{id}/messages", ch.signedIn(ch.sendMessage))
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
-	protectedChat := protectAPI(chatMux, 120)
+	protectedChat := protectAPI(chatMux, 600)
 	for _, pattern := range []string{"/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}

@@ -336,3 +336,42 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-remember-account { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: 9px !important; color: var(--z-muted); font-size: 13px !important; font-weight: 400 !important; }
 .z-remember-account input { width: 17px; height: 17px; min-height: 17px; accent-color: var(--z-lime); }
 .z-account-switch { display: flex; justify-content: space-between; width: 100%; margin-block: 5px; overflow-wrap: anywhere; }
+
+/* Keep the navigation control centered and stationary; only its chevrons turn. */
+.z-sidebar-bottom .z-collapse { justify-self: center; align-self: center; margin: 0; flex: 0 0 40px; width: 40px; height: 40px; transform: none !important; transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.z-sidebar-bottom .z-collapse:hover, .z-sidebar-bottom .z-collapse:active { transform: none !important; }
+.z-sidebar-bottom .z-collapse svg { transition: transform 480ms cubic-bezier(.2,.75,.25,1); }
+.z-shell[data-nav-side=left] .z-sidebar-bottom .z-collapse svg { transform: rotate(0deg); }
+.z-shell[data-nav-side=left].is-compact .z-sidebar-bottom .z-collapse svg { transform: rotate(-90deg); }
+.z-shell[data-nav-side=right] .z-sidebar-bottom .z-collapse svg { transform: rotate(180deg); }
+.z-shell[data-nav-side=right].is-compact .z-sidebar-bottom .z-collapse svg { transform: rotate(270deg); }
+
+/* A plain, familiar emoji picker that inserts at the current caret. */
+.z-composer-field { position: relative; }
+.z-composer-field textarea { padding-right: 38px !important; }
+.z-emoji-picker { position: absolute; right: 5px; top: 50%; z-index: 9; transform: translateY(-50%); }
+.z-emoji-toggle { display: grid; place-items: center; width: 34px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #b9aeba; }
+.z-emoji-toggle:hover:not(:disabled), .z-emoji-toggle[aria-expanded=true] { background: #ffffff0d; color: var(--z-lime); }
+.z-emoji-panel { position: absolute; right: -4px; bottom: calc(100% + 12px); display: grid; gap: 9px; width: 264px; padding: 12px; border: 1px solid #ff149347; border-radius: 16px; color: var(--z-text); background: #17131aed; -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%); box-shadow: 0 14px 40px #0009, 0 0 18px #ff149318; animation: z-menu-soft-in 180ms cubic-bezier(.2,.7,.2,1) both; }
+.z-emoji-panel>strong { padding: 0 2px 6px; border-bottom: 1px solid #ffffff12; color: var(--z-muted); font-size: 11px; font-weight: 650; }
+.z-emoji-panel>div { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 3px; }
+.z-emoji-panel>div>button { display: grid; place-items: center; min-width: 0; min-height: 32px; padding: 2px; border: 0; border-radius: 8px; background: transparent; font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif; font-size: 20px; line-height: 1; }
+.z-emoji-panel>div>button:hover { background: #ff149326; transform: scale(1.08); }
+@media(max-width:720px) { .z-emoji-panel { right: -3px; width: min(264px,calc(100vw - 34px)); } }
+
+/* Make reactions easy to notice while keeping their emoji glyphs familiar. */
+.z-reaction-list button { min-width: 43px; min-height: 30px; gap: 6px; padding: 4px 9px; border: 1px solid #ff14935a; border-radius: 999px; background: #ff149316; color: var(--z-text); font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif; font-size: 17px; line-height: 1; box-shadow: 0 2px 8px #0004; }
+.z-reaction-list button span { color: #f0e4ee; font-family: Manrope,system-ui,sans-serif; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.z-reaction-list button.is-mine { border-color: #b7ff3980; background: #b7ff3920; box-shadow: 0 0 12px #b7ff391d; }
+.z-reaction-list button.is-mine span { color: var(--z-lime); }
+@media(prefers-reduced-motion:reduce) { .z-sidebar-bottom .z-collapse svg { transition: none; } .z-emoji-panel { animation: none; } }
+
+/* Emoji artwork is local and decoded only when it approaches the viewport. */
+.z-emoji { display: inline-block; width: 1.25em; height: 1.25em; max-width: none; object-fit: contain; vertical-align: -.24em; }
+.z-reaction-list .z-emoji { width: 24px; height: 24px; }
+.z-reaction-picker .z-emoji { width: 25px; height: 25px; }
+.z-emoji-panel { width: min(310px,calc(100vw - 34px)); max-height: min(440px,65dvh); overflow: hidden; }
+.z-emoji-panel>input { width: 100%; min-width: 0; min-height: 38px; padding: 7px 10px; border: 1px solid #ffffff18; border-radius: 10px; background: #ffffff08; color: var(--z-text); font-size: 16px; }
+.z-emoji-panel>.z-emoji-grid { max-height: min(280px,40dvh); overflow-y: auto; overscroll-behavior: contain; grid-auto-rows: 36px; }
+.z-emoji-grid .z-emoji { width: 26px; height: 26px; }
+.z-emoji-more { min-height: 32px; padding: 5px 9px; border: 0; border-radius: 9px; background: #ffffff08; color: var(--z-muted); font-size: 12px; }

@@ -4,11 +4,12 @@ export function maskBirthDate(value:string):string {
 }
 export function parseBirthDate(value:string,today=new Date()):string {
  const match=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value)
- const invalid=()=>new Error('Введите настоящую дату рождения в формате ДД.ММ.ГГГГ, от 1900 года до сегодняшнего дня.')
+ const invalid=()=>new Error('Для регистрации нужно указать настоящую дату рождения и быть не младше 14 лет.')
  if(!match)throw invalid()
  const [,day,month,year]=match;const date=new Date(Number(year),Number(month)-1,Number(day))
  const end=new Date(today.getFullYear(),today.getMonth(),today.getDate())
- if(Number(year)<1900||date.getFullYear()!==Number(year)||date.getMonth()!==Number(month)-1||date.getDate()!==Number(day)||date>end)throw invalid()
+ const age=end.getFullYear()-date.getFullYear()-((end.getMonth()<date.getMonth()||(end.getMonth()===date.getMonth()&&end.getDate()<date.getDate()))?1:0)
+ if(Number(year)<1900||date.getFullYear()!==Number(year)||date.getMonth()!==Number(month)-1||date.getDate()!==Number(day)||date>=end||age<14)throw invalid()
  return `${year}-${month}-${day}`
 }
 export function formatBirthDate(value?:string):string {

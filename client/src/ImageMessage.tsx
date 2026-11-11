@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { isChatImageURL } from './image-draft'
-export function ImageMessage({url,onOpenChange,gallery=[],index=0,thumbnail=false}:{url?:string;onOpenChange?:(open:boolean)=>void;gallery?:string[];index?:number;thumbnail?:boolean}) {
+export function ImageMessage({url,onOpenChange,gallery=[],index=0,thumbnail:_thumbnail=false}:{url?:string;onOpenChange?:(open:boolean)=>void;gallery?:string[];index?:number;thumbnail?:boolean}) {
  const [open,setOpen]=useState(false)
  const [failedURL,setFailedURL]=useState<string|null>(null)
  const [attempt,setAttempt]=useState(0)
@@ -11,7 +11,7 @@ export function ImageMessage({url,onOpenChange,gallery=[],index=0,thumbnail=fals
  if(!isChatImageURL(url))return <p className="notice">Фото недоступно.</p>
  const viewerGallery=gallery.filter(isChatImageURL)
  const viewerIndex=viewerGallery.indexOf(url)
- return <div className="z-image-message" style={{'--photo-ratio':ratio} as CSSProperties}>{failedURL===url?<div role="alert"><p>Не удалось загрузить фото.</p><button type="button" className="secondary" onClick={()=>{setFailedURL(null);setAttempt(value=>value+1)}}>Повторить</button></div>:<button type="button" className="z-message-image-button" aria-label="Увеличить фото в сообщении" onClick={()=>setOpen(true)}><img key={attempt} src={thumbnail?url+"?preview=1":url} alt="Фото в сообщении" loading="lazy" onLoad={event=>setRatio(event.currentTarget.naturalWidth/event.currentTarget.naturalHeight)} onError={()=>setFailedURL(url)}/></button>}{open&&<ImageViewer url={url} gallery={viewerGallery.length?viewerGallery:[url]} index={viewerIndex>=0?viewerIndex:index} onClose={()=>setOpen(false)}/>}</div>
+ return <div className="z-image-message" style={{'--photo-ratio':ratio} as CSSProperties}>{failedURL===url?<div role="alert"><p>Не удалось загрузить фото.</p><button type="button" className="secondary" onClick={()=>{setFailedURL(null);setAttempt(value=>value+1)}}>Повторить</button></div>:<button type="button" className="z-message-image-button" aria-label="Увеличить фото в сообщении" onClick={()=>setOpen(true)}><img key={attempt} src={url+(url.includes("?")?"&":"?")+"preview=1"} alt="Фото в сообщении" loading="lazy" decoding="async" fetchPriority="low" onLoad={event=>setRatio(event.currentTarget.naturalWidth/event.currentTarget.naturalHeight)} onError={()=>setFailedURL(url)}/></button>}{open&&<ImageViewer url={url} gallery={viewerGallery.length?viewerGallery:[url]} index={viewerIndex>=0?viewerIndex:index} onClose={()=>setOpen(false)}/>}</div>
 }
 function ImageViewer({url,gallery,index,onClose}:{url:string;gallery:string[];index:number;onClose:()=>void}) {
  const dialog=useRef<HTMLDialogElement>(null)

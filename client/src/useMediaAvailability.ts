@@ -1,11 +1,11 @@
+import { getRealtimeConfig } from './realtime-config'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/api'
 import { mediaCapability } from './media-capabilities'
 import type { MediaFeature } from './media-capabilities'
 export function useMediaAvailability(feature:MediaFeature) {
  const config=useQuery({
   queryKey:['media-capabilities'],
-  queryFn:async()=> (await api.get<unknown>('/realtime/config')).data,
+  queryFn:getRealtimeConfig,
   retry:false,
   staleTime: 5 * 60_000,
  })

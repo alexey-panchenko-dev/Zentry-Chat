@@ -9,7 +9,7 @@ export function blockNotice(state:Pick<ConversationControls,'blocked_by_me'|'blo
  return state.blocked_by_me?'Вы заблокировали контакт.':''
 }
 
-export type RemovalAction='delete_chat'
-export function isRemovalAction(action:ControlAction):action is RemovalAction{return action==='delete_chat'}
+export type RemovalAction='delete_chat'|'delete_everyone'|'remove_contact'
+export function isRemovalAction(action:ControlAction):action is RemovalAction{return action==='delete_chat'||action==='delete_everyone'||action==='remove_contact'}
 export function removalCommitted(action:ControlAction,state:{hidden?:boolean}):boolean{return isRemovalAction(action)&&state.hidden===true}
 export function withoutConversation<Page extends{conversations:Array<{id:string}>}>(pages:Page[],id:string):Page[]{return pages.map(page=>({...page,conversations:page.conversations.filter(conversation=>conversation.id!==id)}))}

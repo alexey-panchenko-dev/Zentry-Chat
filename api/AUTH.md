@@ -14,8 +14,9 @@ GET /api/auth/me возвращает 200 с {"user":...} или 401, если �
 POST /api/auth/logout удаляет текущую сессию и cookie, возвращает 204 без тела.
 На всех POST обязателен Content-Type: application/json, для logout передайте {}.
 
-Имя: 1–100 символов после удаления крайних пробелов. Почта приводится к нижнему регистру.
-Пароль: 12–72 байта UTF-8 (у кириллицы и эмодзи символ может занимать несколько байтов).
+Имя при регистрации является уникальным @юзером: латинские буквы, цифры и `_`. Почта приводится к нижнему регистру.
+Дата рождения обязательна; сервер проверяет минимальный возраст 14 лет, календарную корректность и отсутствие будущей даты.
+Новый пароль при регистрации и сбросе: 6–16 символов; обязательны латинские строчные и заглавные буквы, цифра и один из символов `& * $ %`. Для входа принимаются ранее установленные пароли, в том числе не соответствующие новому правилу.
 Пароль не обрезается и не изменяется. Ошибки имеют вид {"error":"code"}.
 Неверные данные — 400, неверные реквизиты входа — 401, занятая почта — 409,
 неподтверждённая почта — 403, неподдерживаемый Content-Type — 415,
@@ -24,17 +25,17 @@ POST /api/auth/logout удаляет текущую сессию и cookie, во
 
 ## Проверка PowerShell
 
-Сначала настройте Gmail SMTP в корневом .env, затем из корня запустите Docker Compose.
+Сначала настройте Brevo API в корневом .env, затем из корня запустите Docker Compose.
 После регистрации возьмите шестизначный код из письма и вставьте его в строку `$code`.
 
 ```powershell
 $base = "http://localhost:9090"
 $email = "test-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())@example.com"
-$registration = @{name="Test"; email=$email; password="test-password-12345"} | ConvertTo-Json
+$registration = @{name="Test"; email=$email; password='Zently7$'; birth_date="2000-01-01"} | ConvertTo-Json
 Invoke-RestMethod "$base/api/auth/register" -Method Post -ContentType "application/json" -Body $registration
 $code = Read-Host "Код из письма"
 @{email=$email; code=$code} | ConvertTo-Json | Invoke-RestMethod "$base/api/auth/verify-email" -Method Post -ContentType "application/json"
-$login = @{email=$email; password="test-password-12345"} | ConvertTo-Json
+$login = @{email=$email; password='Zently7$'} | ConvertTo-Json
 Invoke-RestMethod "$base/api/auth/login" -Method Post -ContentType "application/json" -Body $login -SessionVariable chatSession
 Invoke-RestMethod "$base/api/auth/me" -WebSession $chatSession
 Invoke-RestMethod "$base/api/auth/logout" -Method Post -ContentType "application/json" -Body '{}' -WebSession $chatSession
@@ -69,11 +70,16 @@ ALLOWED_ORIGINS — разрешённые адреса фронтенда че�
 а не сами коды. Все ответы авторизации имеют Cache-Control: no-store и ограничение
 частоты запросов по IP.
 
-Для Gmail SMTP задайте на сервере SMTP_HOST=smtp.gmail.com, SMTP_PORT=587,
-SMTP_USERNAME, SMTP_PASSWORD (пароль приложения Google), SMTP_FROM и SITE_URL.
-Для отправителя Gmail включите двухэтапную проверку и создайте отдельный пароль
-приложения. Обычный пароль Google использовать нельзя. Эти параметры задаются в
-локальном .env и в секретах хостинга, никогда в исходном коде.
+Почта отправляется через HTTPS endpoint Brevo `POST https://api.brevo.com/v3/smtp/email`.
+Задайте `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `BREVO_FROM_NAME` и `SITE_URL`.
+Адрес отправителя должен быть подтверждён в Brevo. API-ключ задавайте только
+в локальном `.env` или в секретах Render, никогда в исходном коде.
+
+Регистрация хранится во временной таблице `pending_registrations`; строка в `users`
+создаётся только после верного кода. У заявки одна уникальная почта и один уникальный
+@юзер. Код истекает через 10 минут; вместе с ним истекает незавершённая заявка.
+Сброс пароля тоже требует отдельного запроса кода, а новый пароль сохраняется только
+после его проверки.
 
 ## Реализация и ограничения
 

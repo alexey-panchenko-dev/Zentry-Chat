@@ -19,7 +19,10 @@ import (
 
 const sessionCookie = "chat_session"
 
-type authHandlers struct { service *auth.Service; mailer codeMailer }
+type authHandlers struct {
+	service *auth.Service
+	mailer  codeMailer
+}
 
 var emailCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
 
@@ -34,10 +37,6 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 	if !readAuthJSON(w, r, &input) {
 		return
 	}
-	if h.mailer == nil || !h.mailer.Configured() {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error":"email_delivery_not_configured"})
-		return
-	}
 	input.Name = strings.TrimSpace(input.Name)
 	username := strings.ToLower(strings.TrimPrefix(input.Name, "@"))
 
@@ -49,22 +48,32 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		!validPassword(input.Password) {
 		writeJSON(w, 400, map[string]string{
 			"error":   "invalid_input",
-			"message": "Нужны @юзер (3–40 символов: латиница, цифры и _), почта и пароль (12–72 байта UTF-8)",
+			"message": "Нужны @юзер, почта и пароль длиной 6–16 символов: латинские строчные и заглавные буквы, цифра и один из символов & * $ %",
 		})
 		return
 	}
 
-	if input.BirthDate != nil {
-		if _, err := auth.ParseBirthDate(*input.BirthDate, time.Now()); err != nil {
-			writeJSON(w, 400, map[string]string{"error": "invalid_birth_date"})
-			return
-		}
+	if input.BirthDate == nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_birth_date"})
+		return
+	}
+	if _, err := auth.ParseBirthDate(*input.BirthDate, time.Now()); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_birth_date"})
+		return
+	}
+	if h.mailer == nil || !h.mailer.Configured() {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "email_delivery_not_configured"})
+		return
 	}
 	_, err := h.service.RegisterPendingWithBirthDate(
 		r.Context(),
 		username,
 		email,
 		input.Password, input.BirthDate, username)
+	if errors.Is(err, auth.ErrRegistrationPending) {
+		writeJSON(w, 409, map[string]string{"error": "registration_pending"})
+		return
+	}
 	if errors.Is(err, auth.ErrEmailExists) {
 		writeJSON(w, 409, map[string]string{"error": "email_already_registered"})
 		return
@@ -78,65 +87,148 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code, err := h.service.IssueEmailCode(r.Context(), email, auth.VerificationPurpose)
-	if err != nil { authFailure(w, err); return }
+	if errors.Is(err, auth.ErrCodeCooldown) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "code_resend_too_soon"})
+		return
+	}
+	if err != nil {
+		authFailure(w, err)
+		return
+	}
 	delivery := true
-	if err := h.mailer.SendCode(email, code, auth.VerificationPurpose); err != nil { log.Printf("Не удалось отправить код подтверждения"); delivery = false }
-	writeJSON(w, http.StatusAccepted, map[string]any{"verification_required":true,"delivery_sent":delivery,"email":email})
+	if err := h.mailer.SendCode(email, code, auth.VerificationPurpose); err != nil {
+		log.Printf("Не удалось отправить код подтверждения")
+		delivery = false
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"verification_required": true, "delivery_sent": delivery, "email": email})
 }
 
 func (h *authHandlers) verifyEmail(w http.ResponseWriter, r *http.Request) {
-	var input struct { Email string `json:"email"`; Code string `json:"code"` }
-	if !readAuthJSON(w,r,&input) { return }
+	var input struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if !readAuthJSON(w, r, &input) {
+		return
+	}
 	email, ok := normalizedEmail(input.Email)
-	if !ok || !emailCodePattern.MatchString(input.Code) { writeJSON(w,400,map[string]string{"error":"invalid_verification_code"}); return }
-	err := h.service.VerifyEmailCode(r.Context(),email,input.Code)
-	if err != nil { authCodeFailure(w,err); return }
-	writeJSON(w,200,map[string]bool{"verified":true})
+	if !ok || !emailCodePattern.MatchString(input.Code) {
+		writeJSON(w, 400, map[string]string{"error": "invalid_verification_code"})
+		return
+	}
+	err := h.service.VerifyEmailCode(r.Context(), email, input.Code)
+	if errors.Is(err, auth.ErrUsernameExists) {
+		writeJSON(w, 409, map[string]string{"error": "username_taken"})
+		return
+	}
+	if errors.Is(err, auth.ErrEmailExists) {
+		writeJSON(w, 409, map[string]string{"error": "email_already_registered"})
+		return
+	}
+	if err != nil {
+		authCodeFailure(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"verified": true})
 }
 
 func (h *authHandlers) resendVerification(w http.ResponseWriter, r *http.Request) {
-	var input struct { Email string `json:"email"` }
-	if !readAuthJSON(w,r,&input) { return }
+	var input struct {
+		Email string `json:"email"`
+	}
+	if !readAuthJSON(w, r, &input) {
+		return
+	}
 	email, ok := normalizedEmail(input.Email)
-	if !ok { writeJSON(w,400,map[string]string{"error":"invalid_email"}); return }
-	if h.mailer == nil || !h.mailer.Configured() { writeJSON(w,503,map[string]string{"error":"email_delivery_not_configured"}); return }
-	code, exists, err := h.service.IssueVerificationCode(r.Context(),email)
-	if err == nil && !exists { w.WriteHeader(http.StatusNoContent); return }
-	if errors.Is(err,auth.ErrCodeCooldown) { writeJSON(w,429,map[string]string{"error":"code_resend_too_soon"}); return }
-	if err != nil { authFailure(w,err); return }
-	if err := h.mailer.SendCode(email,code,auth.VerificationPurpose); err != nil { log.Printf("Не удалось отправить код подтверждения"); writeJSON(w,503,map[string]string{"error":"email_delivery_failed"}); return }
+	if !ok {
+		writeJSON(w, 400, map[string]string{"error": "invalid_email"})
+		return
+	}
+	if h.mailer == nil || !h.mailer.Configured() {
+		writeJSON(w, 503, map[string]string{"error": "email_delivery_not_configured"})
+		return
+	}
+	code, exists, err := h.service.IssueVerificationCode(r.Context(), email)
+	if err == nil && !exists {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if errors.Is(err, auth.ErrCodeCooldown) {
+		writeJSON(w, 429, map[string]string{"error": "code_resend_too_soon"})
+		return
+	}
+	if err != nil {
+		authFailure(w, err)
+		return
+	}
+	if err := h.mailer.SendCode(email, code, auth.VerificationPurpose); err != nil {
+		log.Printf("Не удалось отправить код подтверждения")
+		writeJSON(w, 503, map[string]string{"error": "email_delivery_failed"})
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *authHandlers) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
-	var input struct { Email string `json:"email"` }
-	if !readAuthJSON(w,r,&input) { return }
-	email, ok := normalizedEmail(input.Email)
-	if !ok { writeJSON(w,400,map[string]string{"error":"invalid_email"}); return }
-	if h.mailer == nil || !h.mailer.Configured() { writeJSON(w,503,map[string]string{"error":"email_delivery_not_configured"}); return }
-	code, exists, err := h.service.IssueRecoveryCode(r.Context(),email)
-	if err != nil && !errors.Is(err,auth.ErrCodeCooldown) { authFailure(w,err); return }
-	if exists && code != "" {
-		if err := h.mailer.SendCode(email,code,auth.RecoveryPurpose); err != nil { log.Printf("Не удалось отправить письмо восстановления") }
+	var input struct {
+		Email string `json:"email"`
 	}
-	writeJSON(w,http.StatusAccepted,map[string]string{"message":"Если аккаунт с такой почтой существует, код отправлен."})
+	if !readAuthJSON(w, r, &input) {
+		return
+	}
+	email, ok := normalizedEmail(input.Email)
+	if !ok {
+		writeJSON(w, 400, map[string]string{"error": "invalid_email"})
+		return
+	}
+	if h.mailer == nil || !h.mailer.Configured() {
+		writeJSON(w, 503, map[string]string{"error": "email_delivery_not_configured"})
+		return
+	}
+	code, exists, err := h.service.IssueRecoveryCode(r.Context(), email)
+	if err != nil && !errors.Is(err, auth.ErrCodeCooldown) {
+		authFailure(w, err)
+		return
+	}
+	if exists && code != "" {
+		if err := h.mailer.SendCode(email, code, auth.RecoveryPurpose); err != nil {
+			log.Printf("Не удалось отправить письмо восстановления")
+		}
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"message": "Если аккаунт с такой почтой существует, код отправлен."})
 }
 
 func (h *authHandlers) resetPassword(w http.ResponseWriter, r *http.Request) {
-	var input struct { Email string `json:"email"`; Code string `json:"code"`; Password string `json:"password"` }
-	if !readAuthJSON(w,r,&input) { return }
+	var input struct {
+		Email    string `json:"email"`
+		Code     string `json:"code"`
+		Password string `json:"password"`
+	}
+	if !readAuthJSON(w, r, &input) {
+		return
+	}
 	email, ok := normalizedEmail(input.Email)
-	if !ok || !emailCodePattern.MatchString(input.Code) || !validPassword(input.Password) { writeJSON(w,400,map[string]string{"error":"invalid_reset_input"}); return }
-	if err := h.service.ResetPasswordWithCode(r.Context(),email,input.Code,input.Password); err != nil { authCodeFailure(w,err); return }
+	if !ok || !emailCodePattern.MatchString(input.Code) || !validPassword(input.Password) {
+		writeJSON(w, 400, map[string]string{"error": "invalid_reset_input"})
+		return
+	}
+	if err := h.service.ResetPasswordWithCode(r.Context(), email, input.Code, input.Password); err != nil {
+		authCodeFailure(w, err)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func authCodeFailure(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err,auth.ErrCodeInvalid): writeJSON(w,400,map[string]string{"error":"invalid_verification_code"})
-	case errors.Is(err,auth.ErrCodeExpired): writeJSON(w,400,map[string]string{"error":"verification_code_expired"})
-	case errors.Is(err,auth.ErrCodeAttempts): writeJSON(w,429,map[string]string{"error":"verification_attempts_exceeded"})
-	default: authFailure(w,err)
+	case errors.Is(err, auth.ErrCodeInvalid):
+		writeJSON(w, 400, map[string]string{"error": "invalid_verification_code"})
+	case errors.Is(err, auth.ErrCodeExpired):
+		writeJSON(w, 400, map[string]string{"error": "verification_code_expired"})
+	case errors.Is(err, auth.ErrCodeAttempts):
+		writeJSON(w, 429, map[string]string{"error": "verification_attempts_exceeded"})
+	default:
+		authFailure(w, err)
 	}
 }
 
@@ -149,7 +241,7 @@ func (h *authHandlers) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email, ok := normalizedEmail(input.Email)
-	if !ok || !validPassword(input.Password) {
+	if !ok || !validLoginPassword(input.Password) {
 		writeJSON(w, 401, map[string]string{"error": "invalid_credentials"})
 		return
 	}
@@ -159,7 +251,10 @@ func (h *authHandlers) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "login_temporarily_locked"})
 		return
 	}
-	if errors.Is(err, auth.ErrEmailNotVerified) { writeJSON(w,403,map[string]string{"error":"email_not_verified"}); return }
+	if errors.Is(err, auth.ErrEmailNotVerified) {
+		writeJSON(w, 403, map[string]string{"error": "email_not_verified"})
+		return
+	}
 	if errors.Is(err, auth.ErrCredentials) {
 		writeJSON(w, 401, map[string]string{"error": "invalid_credentials"})
 		return
@@ -246,7 +341,29 @@ func normalizedEmail(value string) (string, bool) {
 }
 
 func validPassword(value string) bool {
-	return utf8.ValidString(value) && len(value) >= 12 && len(value) <= 72
+	if !utf8.ValidString(value) || len(value) < 6 || len(value) > 16 {
+		return false
+	}
+	var lower, upper, digit, special bool
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			lower = true
+		case r >= 'A' && r <= 'Z':
+			upper = true
+		case r >= '0' && r <= '9':
+			digit = true
+		case strings.ContainsRune("&*$%", r):
+			special = true
+		default:
+			return false
+		}
+	}
+	return lower && upper && digit && special
+}
+
+func validLoginPassword(value string) bool {
+	return utf8.ValidString(value) && len(value) > 0 && len(value) <= 72
 }
 
 func authFailure(w http.ResponseWriter, err error) {

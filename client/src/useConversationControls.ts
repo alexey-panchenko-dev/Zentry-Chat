@@ -1,3 +1,4 @@
+import { getRealtimeConfig } from './realtime-config'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { InfiniteData } from '@tanstack/react-query'
 import { api } from '@/api'
@@ -7,7 +8,7 @@ import { messageVisible, removalCommitted, withoutConversation } from './convers
 import type { ConversationControls, ControlAction } from './conversation-controls'
 export function useConversationControls(conversationID?:string,realtimeReady=true) {
  const cache=useQueryClient()
- const capability=useQuery({queryKey:['media-capabilities'],queryFn:async()=>(await api.get<unknown>('/realtime/config')).data,retry:false,staleTime:5*60_000})
+ const capability=useQuery({queryKey:['media-capabilities'],queryFn:getRealtimeConfig,retry:false,staleTime:5*60_000})
  const supported=mediaCapability(capability.data,'chat_controls')
  const removalSupported=mediaCapability(capability.data,'chat_removal')
  const query=useQuery({queryKey:['chat-controls',conversationID],enabled:supported&&!!conversationID,queryFn:async({signal})=>(await api.get<ConversationControls>(`/conversations/${conversationID}/controls`,{signal})).data,retry:false,refetchInterval:supported&&!realtimeReady?60_000:false})
@@ -17,6 +18,11 @@ export function useConversationControls(conversationID?:string,realtimeReady=tru
   if(value==='clear'||value==='delete_chat'||value==='delete_everyone'){
    await cache.cancelQueries({queryKey:['messages',id]})
    cache.setQueryData<InfiniteData<MessagePage>>(['messages',id],old=>old?{...old,pages:old.pages.map(page=>({...page,messages:page.messages.filter(message=>messageVisible(message.id,state.cleared_through))}))}:old)
+   for(const queryKey of [['chat-media','personal',id],['details-search','personal',id],['pinned-messages',id]]){
+    await cache.cancelQueries({queryKey})
+    cache.removeQueries({queryKey})
+   }
+   void cache.invalidateQueries({queryKey:['favorites']})
   }
   if(removalCommitted(value,state)){
    await cache.cancelQueries({queryKey:['conversations']})

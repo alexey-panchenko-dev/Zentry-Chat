@@ -20,7 +20,7 @@ func TestMediaOriginGuardAndPreflight(t *testing.T) {
 	r.Header.Set("Origin", "http://localhost:5173")
 	w := httptest.NewRecorder()
 	newRouter(nil).ServeHTTP(w, r)
-	if w.Code != 204 || w.Header().Get("Access-Control-Allow-Methods") != "GET, POST, DELETE, OPTIONS" {
+	if w.Code != 204 || w.Header().Get("Access-Control-Allow-Methods") != "GET, POST, PUT, DELETE, OPTIONS" {
 		t.Fatalf("delete preflight %d %v", w.Code, w.Header())
 	}
 }

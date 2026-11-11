@@ -12,12 +12,12 @@ import { api, errorText, visibleUsername } from '@/api'
 import type { Conversation, User } from '@/api'
 import { Avatar } from '@/Visual'
 export type PeerProfile=User&{phone?:string;birthday?:string;sent_count?:number;received_count?:number;online?:boolean;display_name?:string}
-const actionLabel:Record<ControlAction,string>={clear:'Очистить историю',delete_chat:'Удалить только у меня',delete_everyone:'Удалить у всех',remove_contact:'Удалить контакт',block:'Заблокировать',unblock:'Разблокировать'}
+const actionLabel:Record<ControlAction,string>={clear:'Очистить историю',delete_chat:'Удалить только у меня',delete_everyone:'Удалить у всех',remove_contact:'Удалить из моих чатов',block:'Заблокировать',unblock:'Разблокировать'}
 const actionDescription:Record<ControlAction,string>={
  clear:'Очистить историю этой переписки только у вас? У собеседника сообщения сохранятся.',
  delete_chat:'Удалить чат только у вас? История будет очищена, а переписка исчезнет из вашего списка. У собеседника сообщения сохранятся.',
- delete_everyone:'Удалить переписку у вас и собеседника? Все текущие сообщения исчезнут у обоих. Новые сообщения после этого будут отображаться как обычно.',
- remove_contact:'Удалить контакт из вашего списка? Переписка будет скрыта только у вас, история сохранится. Собеседник не будет заблокирован.',
+ delete_everyone:'Удалить переписку у вас и собеседника? Текущие сообщения исчезнут у обоих. Если кто-то из вас напишет снова, переписка появится с новым сообщением.',
+ remove_contact:'Убрать человека из вашего списка чатов и контактов? История останется доступна при повторном открытии через поиск. Новое сообщение вернёт чат в список; чтобы запретить сообщения и звонки, выберите «Заблокировать».',
  block:'Заблокировать контакт? Сообщения и звонки между вами станут недоступны до разблокировки.',
  unblock:'Разблокировать контакт и снова разрешить сообщения и звонки?',
 }
@@ -65,7 +65,7 @@ export function ContactProfile({conversation,onClose,onCall,onRemoved,callBusy=f
  }}>
  <div className="z-contact-dialog-head"><h2 id="contact-profile-title">{confirmation?'Подтвердите действие':'Профиль'}</h2><div className="z-contact-top-actions">
  {controls.supported&&!confirmation&&<details ref={menu} className="z-contact-more" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))event.currentTarget.open=false}}><summary className="z-icon" aria-label="Действия с контактом" title="Действия с контактом"><MoreHorizontal/></summary><div className="z-contact-menu">
- {controls.removalSupported&&<><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_everyone')}>Удалить у всех</button><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_chat')}>Удалить только у меня</button></>}
+ {controls.removalSupported&&<><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_everyone')}>Удалить у всех</button><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('delete_chat')}>Удалить только у меня</button><button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose('remove_contact')}>Удалить из моих чатов</button></>}
  <button type="button" disabled={controls.loading||!!controls.error} onClick={()=>choose(controls.state?.blocked_by_me?'unblock':'block')}>{controls.state?.blocked_by_me?'Разблокировать':'Заблокировать'}</button>
  </div></details>}
  <button type="button" className="z-icon" aria-label="Закрыть профиль" autoFocus disabled={controls.action.isPending} onClick={close}><X/></button></div></div>

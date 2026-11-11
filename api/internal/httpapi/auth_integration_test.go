@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"newsChat/api/internal/auth"
 	"newsChat/api/internal/database"
 )
 
@@ -36,7 +37,8 @@ func TestHTTPAuthLifecycle(t *testing.T) {
 	}
 	t.Setenv("COOKIE_SECURE", "false")
 	t.Setenv("ALLOWED_ORIGINS", "http://localhost:9090")
-	server := httptest.NewServer(newRouter(db))
+	mailer := &recordingMailer{}
+	server := httptest.NewServer(newRouterWithMailer(db, mailer))
 	defer server.Close()
 	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar, Timeout: 10 * time.Second}
@@ -69,18 +71,34 @@ func TestHTTPAuthLifecycle(t *testing.T) {
 	request("GET", "/api/ready", "", 200)
 	request("GET", "/api/auth/me", "", 401)
 	handle := fmt.Sprintf("http_test_%d", time.Now().UnixNano())
-	registration := fmt.Sprintf(`{"name":%q,"email":%q,"password":"test-password-12345"}`, handle, email)
-	registered := request("POST", "/api/auth/register", registration, 201)
+	registration := fmt.Sprintf(`{"name":%q,"email":%q,"password":"Strong1&","birth_date":"2000-01-01"}`, handle, email)
+	registered := request("POST", "/api/auth/register", registration, 202)
+	if len(registered.Cookies()) != 0 {
+		t.Fatal("registration issued a session before verification")
+	}
+	request("GET", "/api/auth/me", "", 401)
+	var registeredUsers int
+	if err := db.QueryRow(ctx, `SELECT count(*) FROM users WHERE email=$1`, email).Scan(&registeredUsers); err != nil || registeredUsers != 0 {
+		t.Fatal("unverified signup created a user", err)
+	}
+	request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"Strong1&"}`, email), 401)
+	// Pending registrations cannot replace credentials while an email code lives.
+	request("POST", "/api/auth/register", fmt.Sprintf(`{"name":%q,"email":%q,"password":"Stolen1&","birth_date":"2000-01-01"}`, handle+"x", email), 409)
+	code := mailer.code(email, auth.VerificationPurpose)
+	if len(code) != 6 {
+		t.Fatal("verification email was not queued")
+	}
+	request("POST", "/api/auth/verify-email", fmt.Sprintf(`{"email":%q,"code":%q}`, email, code), 200)
+	request("POST", "/api/auth/register", registration, 409)
+	request("POST", "/api/auth/register", fmt.Sprintf(`{"name":%q,"email":%q,"password":"Strong1&","birth_date":"2000-01-01"}`, handle, "other-"+email), 409)
+	request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"wrong-password-123"}`, email), 401)
+	response := request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"Strong1&"}`, email), 200)
 	var signup struct {
 		User struct{ Name, Username string } `json:"user"`
 	}
-	if err := json.NewDecoder(registered.Body).Decode(&signup); err != nil || signup.User.Name != handle || signup.User.Username != handle {
+	if err := json.NewDecoder(response.Body).Decode(&signup); err != nil || signup.User.Name != handle || signup.User.Username != handle {
 		t.Fatalf("registration nickname is not the @username: %+v, %v", signup, err)
 	}
-	request("POST", "/api/auth/register", registration, 409)
-	request("POST", "/api/auth/register", fmt.Sprintf(`{"name":%q,"email":%q,"password":"test-password-12345"}`, handle, "other-"+email), 409)
-	request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"wrong-password-123"}`, email), 401)
-	response := request("POST", "/api/auth/login", fmt.Sprintf(`{"email":%q,"password":"test-password-12345"}`, email), 200)
 	cookies := response.Cookies()
 	if len(cookies) != 1 || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteLaxMode || cookies[0].MaxAge <= 0 {
 		t.Fatal("incorrect session cookie")

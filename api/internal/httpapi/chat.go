@@ -19,6 +19,7 @@ var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 var socketPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 type chatHandlers struct {
+	budget    accountBudget
 	store     *chat.Store
 	auth      *auth.Service
 	publisher realtime.Publisher
@@ -40,6 +41,11 @@ func (h *chatHandlers) signedIn(next signedInHandler) http.HandlerFunc {
 		}
 		if err != nil {
 			chatFailure(w, err)
+			return
+		}
+		if !h.budget.allow(user.ID, r.Method) {
+			w.Header().Set("Retry-After", "60")
+			writeJSON(w, 429, map[string]string{"error": "too_many_requests"})
 			return
 		}
 		next(w, r, user)
@@ -180,8 +186,15 @@ func (h *chatHandlers) sendMessage(w http.ResponseWriter, r *http.Request, user 
 		writeJSON(w, 400, map[string]string{"error": "invalid_message", "message": "Нужны client_message_id (UUID) и body (1–1000 символов)"})
 		return
 	}
-	if input.ReplyToID!="" { reply,parseErr:=strconv.ParseInt(input.ReplyToID,10,64); if parseErr!=nil||reply<1 { writeJSON(w,400,map[string]string{"error":"invalid_reply"}); return }; input.ReplyToID=strconv.FormatInt(reply,10) }
-	message, created, err := h.store.SendWithReply(r.Context(), id, user.ID, input.ClientMessageID, input.Body,input.ReplyToID)
+	if input.ReplyToID != "" {
+		reply, parseErr := strconv.ParseInt(input.ReplyToID, 10, 64)
+		if parseErr != nil || reply < 1 {
+			writeJSON(w, 400, map[string]string{"error": "invalid_reply"})
+			return
+		}
+		input.ReplyToID = strconv.FormatInt(reply, 10)
+	}
+	message, created, err := h.store.SendWithReply(r.Context(), id, user.ID, input.ClientMessageID, input.Body, input.ReplyToID)
 	if err != nil {
 		chatFailure(w, err)
 		return

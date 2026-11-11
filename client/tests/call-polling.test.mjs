@@ -26,6 +26,7 @@ test('healthy Pusher eliminates idle calls polling, disconnect enables slower re
  const controller=new CallController('me',()=>{})
  try{
   await controller.connect()
+  await new Promise(resolve=>setImmediate(resolve))
   assert.equal(interval,30000)
   client.handlers['pusher:subscription_succeeded']()
   await new Promise(resolve=>setImmediate(resolve))

@@ -4,7 +4,7 @@ import type { ChatOptions } from './ChatWorkspace'
 
 export const defaultAppearance = {
   text: 'normal', density: 'normal', motion: 'full', backdrop: 'zently', navSide: 'right',
-  preview: true, sound: false, enter: true,
+  preview: true, sound: true, enter: true,
 }
 
 type Appearance = typeof defaultAppearance
@@ -34,6 +34,19 @@ export function useIncomingNotices(dialogs: Conversation[], options: Record<stri
   const initialized = useRef(false)
   const newest = useRef(0n)
   const timer = useRef(0)
+  useEffect(() => {
+    try { getNotificationAudio() } catch { /* Sound remains optional when the browser has no Web Audio support. */ }
+    const unlock = () => {
+      const context = getNotificationAudio()
+      if (context?.state === 'suspended') void context.resume().catch(() => {})
+    }
+    window.addEventListener('pointerdown', unlock, true)
+    window.addEventListener('keydown', unlock, true)
+    return () => {
+      window.removeEventListener('pointerdown', unlock, true)
+      window.removeEventListener('keydown', unlock, true)
+    }
+  }, [])
   useEffect(() => () => window.clearTimeout(timer.current), [])
   useEffect(() => {
     if (!loaded) return
@@ -61,21 +74,30 @@ export function useIncomingNotices(dialogs: Conversation[], options: Record<stri
   return { notice, dismiss: () => setNotice(null) }
 }
 
+let notificationAudio: AudioContext | undefined
+function getNotificationAudio() {
+  if (!notificationAudio && typeof window !== 'undefined' && window.AudioContext) notificationAudio = new window.AudioContext()
+  return notificationAudio
+}
+
 function playChime() {
   try {
-    const context = new AudioContext()
-    if (context.state !== 'running') { void context.close(); return }
-    const tone = context.createOscillator()
-    const volume = context.createGain()
+    const context = getNotificationAudio()
+    if (!context || context.state !== 'running') return
     const now = context.currentTime
-    tone.frequency.setValueAtTime(720, now)
-    tone.frequency.setValueAtTime(520, now + .075)
-    volume.gain.setValueAtTime(.035, now)
-    volume.gain.exponentialRampToValueAtTime(.001, now + .16)
-    tone.connect(volume).connect(context.destination)
-    tone.onended = () => { void context.close() }
-    tone.start()
-    tone.stop(now + .16)
+    for (const [frequency, start, peak] of [[659.25, 0, .012], [783.99, .075, .008]] as const) {
+      const tone = context.createOscillator()
+      const volume = context.createGain()
+      const began = now + start
+      tone.type = 'sine'
+      tone.frequency.setValueAtTime(frequency, began)
+      volume.gain.setValueAtTime(.0001, began)
+      volume.gain.linearRampToValueAtTime(peak, began + .025)
+      volume.gain.exponentialRampToValueAtTime(.0001, began + .27)
+      tone.connect(volume).connect(context.destination)
+      tone.start(began)
+      tone.stop(began + .28)
+    }
   } catch { /* Some browsers require a user gesture before playing audio. */ }
 }
 

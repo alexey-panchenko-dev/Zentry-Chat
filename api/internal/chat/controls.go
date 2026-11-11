@@ -98,9 +98,12 @@ func (s *Store) ChangeControls(ctx context.Context, id, user, action string) (Co
 	case "clear", "delete_chat":
 		_, err = tx.Exec(ctx, `UPDATE conversation_members SET cleared_through=GREATEST(cleared_through,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),last_read_id=GREATEST(last_read_id,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),hidden=CASE WHEN $3 THEN true ELSE hidden END WHERE conversation_id=$1 AND user_id=$2`, id, user, action == "delete_chat")
 	case "delete_everyone":
-		_, err = tx.Exec(ctx, `UPDATE conversation_members SET cleared_through=GREATEST(cleared_through,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),last_read_id=GREATEST(last_read_id,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)) WHERE conversation_id=$1`, id)
+		_, err = tx.Exec(ctx, `UPDATE conversation_members SET cleared_through=GREATEST(cleared_through,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),last_read_id=GREATEST(last_read_id,COALESCE((SELECT max(id) FROM messages WHERE conversation_id=$1),0)),hidden=true WHERE conversation_id=$1`, id)
 	case "remove_contact":
 		_, err = tx.Exec(ctx, `UPDATE conversation_members SET hidden=true WHERE conversation_id=$1 AND user_id=$2`, id, user)
+		if err == nil {
+			_, err = tx.Exec(ctx, `DELETE FROM contact_aliases WHERE owner_id=$1 AND peer_id=$2`, user, peer)
+		}
 	case "block":
 		_, err = tx.Exec(ctx, `INSERT INTO contact_blocks(blocker_id,blocked_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, user, peer)
 	case "unblock":

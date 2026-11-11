@@ -22,6 +22,7 @@ func protectAuth(next http.Handler) http.Handler {
 func protectAPI(next http.Handler, maxAttempts int) http.Handler {
 	var mu sync.Mutex
 	attempts := make(map[string]authAttempt)
+	var sweepAfter time.Time
 	origins := os.Getenv("ALLOWED_ORIGINS")
 	if origins == "" {
 		origins = "http://localhost:5173,http://localhost:3000,http://localhost:9090"
@@ -43,7 +44,7 @@ func protectAPI(next http.Handler, maxAttempts int) http.Handler {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Range")
 			w.WriteHeader(204)
 			return
@@ -52,20 +53,31 @@ func protectAPI(next http.Handler, maxAttempts int) http.Handler {
 			writeJSON(w, 403, map[string]string{"error": "origin_required"})
 			return
 		}
-		if r.Method == http.MethodPost {
+		{
 			ip, _, err := net.SplitHostPort(r.RemoteAddr)
 			if err != nil {
 				ip = r.RemoteAddr
 			}
 			now := time.Now()
 			mu.Lock()
-			for key, value := range attempts {
-				if !now.Before(value.until) {
-					delete(attempts, key)
+			if !now.Before(sweepAfter) {
+				for key, value := range attempts {
+					if !now.Before(value.until) {
+						delete(attempts, key)
+					}
 				}
+				sweepAfter = now.Add(5 * time.Second)
+			}
+			limit := maxAttempts
+			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+				ip += ":read"
+				limit *= 5
 			}
 			a := attempts[ip]
-			blocked := a.count >= maxAttempts || (a.count == 0 && len(attempts) >= 10000)
+			if !now.Before(a.until) {
+				a = authAttempt{}
+			}
+			blocked := a.count >= limit || (a.count == 0 && len(attempts) >= 10000)
 			if !blocked {
 				if a.count == 0 {
 					a.until = now.Add(time.Minute)
