@@ -421,3 +421,5 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 
 /* Uniform personal and group rows. */
 .z-conversation-list .z-conversation{min-height:88px;padding:14px 12px;gap:12px;box-sizing:border-box}.z-conversation-list .z-conversation .z-avatar,.z-conversation-list .z-conversation .z-group-avatar{width:52px;height:52px;min-width:52px;max-width:52px;flex:0 0 52px;aspect-ratio:1;border-radius:50%;box-sizing:border-box}.z-conversation-list .z-conversation .z-group-avatar{border:0;background:#302531}.z-conversation-list .z-conversation>span:not(.z-avatar):not(.z-group-avatar){min-width:0;overflow:hidden;flex:1}.z-conversation-list .z-conversation>span>strong{display:block;font-size:19px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.z-conversation-list .z-conversation>span>small{display:block;font-size:14px;line-height:1.45;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.z-conversation-list{padding-right:15px;box-sizing:border-box;scrollbar-gutter:stable}.z-conversation-list>.z-chat-row{min-width:0;max-width:100%;flex-shrink:0}
