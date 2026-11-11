@@ -28,11 +28,13 @@ func boundedRequests(next http.Handler) http.Handler {
 			return
 		}
 		contentType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		preview := (r.Method == http.MethodGet || r.Method == http.MethodHead) && strings.HasSuffix(r.URL.Path, "/image") && r.URL.Query().Get("preview") == "1"
-		if contentType == "multipart/form-data" || preview {
-			// Normal page loads can queue previews briefly, but decoding and
-			// uploads share the same memory budget. Upload overload fails fast.
-			if preview {
+		mediaRead := (r.Method == http.MethodGet || r.Method == http.MethodHead) &&
+			(strings.HasSuffix(r.URL.Path, "/image") || strings.HasSuffix(r.URL.Path, "/photo") ||
+				strings.HasSuffix(r.URL.Path, "/audio") || strings.HasSuffix(r.URL.Path, "/file"))
+		if contentType == "multipart/form-data" || mediaRead {
+			// Media is stored as database bytes, so original downloads also need
+			// this budget. Normal page loads queue briefly; uploads fail fast.
+			if mediaRead {
 				timer := time.NewTimer(2 * time.Second)
 				defer timer.Stop()
 				select {

@@ -74,11 +74,11 @@ func TestImagePreviewsQueueWithinSharedMediaBudget(t *testing.T) {
 		w.WriteHeader(204)
 	}))
 	var workers sync.WaitGroup
-	for range 2 {
+	for _, path := range []string{"/api/messages/1/file", "/api/profiles/1/photo"} {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/messages/1/image?preview=1", nil))
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", path, nil))
 		}()
 		<-entered
 	}

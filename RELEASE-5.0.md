@@ -18,7 +18,7 @@ Date: 2026-11-11. Base: 12486e0. Production branch: master.
 - No user row or session is created before successful email verification.
 - Request limits cover GET, PUT and DELETE as well as POST. Spoofed forwarding headers are ignored.
 - Verified-account budgets: 300 reads and 120 writes per minute, independent of other accounts.
-- Concurrent API work is bounded to 64 requests; multipart uploads and image-preview decoding share a two-job budget. Preview requests queue briefly; upload overload returns Retry-After. MIME-type case cannot bypass the gate.
+- Concurrent API work is bounded to 64 requests; uploads, original media downloads and image-preview decoding share a two-job memory budget. Media reads queue briefly; upload overload returns Retry-After. MIME-type case cannot bypass the gate.
 - Database/request contexts have a fifteen-second deadline. Direct API responses also receive MIME-sniffing and framing protection.
 - Birth dates cannot be omitted to bypass the minimum registration age of fourteen.
 - Headers are capped at 32 KiB; existing header/body/read/write timeouts remain.
