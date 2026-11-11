@@ -137,7 +137,7 @@
 .z-settings h2 { font-size: 16px; margin: 20px 0 10px; }
 .z-appearance, .z-contact-settings { margin-bottom: 24px; }
 .z-settings .z-setting-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; min-height: 52px; margin: 0; border: 0; border-bottom: 1px solid #ffffff0c; font-size: 14px; }
-.z-setting-row select { width: min(45%, 190px); flex: none; min-height: 36px; padding: 6px 10px; border-radius: 8px; border-color: #ffffff16; background: #211b26; color: #f8f3f7; }
+.z-setting-row select { width: min(45%, 190px); flex: none; min-height: 44px; padding: 9px 38px 9px 14px; border-radius: 8px; border-color: #ffffff16; color: #f8f3f7; appearance: none; -webkit-appearance: none; line-height: 24px; box-sizing: border-box; background: #211b26 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23d9d3df' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 16px 16px; }
 .z-setting-row input[type=checkbox] { flex: none; width: 19px; height: 19px; }
 .z-settings input:not([type=checkbox]), .z-settings textarea { padding: 11px 13px; border-radius: 11px; font-size: 15px; }
 .z-settings .z-field-help { font-size: 12px; }
