@@ -338,7 +338,7 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-account-switch { display: flex; justify-content: space-between; width: 100%; margin-block: 5px; overflow-wrap: anywhere; }
 
 /* Keep the navigation control centered and stationary; only its chevrons turn. */
-.z-sidebar-bottom .z-collapse { justify-self: center; align-self: center; margin: 0; flex: 0 0 40px; width: 40px; height: 40px; transform: none !important; transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.z-sidebar-bottom .z-collapse { justify-self: end; align-self: center; margin: 0 6px 0 0; flex: 0 0 40px; width: 40px; height: 40px; transform: none !important; transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
 .z-sidebar-bottom .z-collapse:hover, .z-sidebar-bottom .z-collapse:active { transform: none !important; }
 .z-sidebar-bottom .z-collapse svg { transition: transform 480ms cubic-bezier(.2,.75,.25,1); }
 .z-shell[data-nav-side=left] .z-sidebar-bottom .z-collapse svg { transform: rotate(0deg); }
