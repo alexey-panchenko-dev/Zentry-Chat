@@ -381,3 +381,6 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-bubble .z-reply-quote>span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;color:inherit;font-size:inherit;line-height:inherit}
 .z-bubble .z-reply-quote strong{display:block;margin-bottom:3px;color:#B7FF39;font-size:14px;font-weight:700}
 .z-bubble .z-reply-quote:hover{background:rgba(0,0,0,.28)}
+
+.z-contact>span>strong,.z-chat-row .z-contact strong{font-size:19px;font-weight:750;line-height:1.3;letter-spacing:-.2px}
+.z-contact>span>small{font-size:14px;line-height:1.45;margin-top:5px}
