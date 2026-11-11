@@ -51,7 +51,8 @@ npm run configure:hosting -- https://ВАШ-АДРЕС-API.onrender.com
 
 Команда создаёт client/vercel.json с настоящим адресом API.
 Закоммитьте получившийся файл в репозиторий перед импортом на Vercel.
-Скрипт содержит только публичный адрес, без секретов.
+Скрипт содержит только публичный адрес, без секретов; сохраняет защитные заголовки.
+Конфигурация также записывается в корень репозитория для проектов Vercel с Root Directory = .
 Импортируйте тот же репозиторий, Root Directory = client, Framework = Vite.
 Build = npm run build, Output = dist, Node.js = 24.x.
 В frontend НЕ нужны DATABASE_URL или PUSHER_SECRET.

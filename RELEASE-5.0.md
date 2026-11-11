@@ -35,6 +35,8 @@ Date: 2026-11-11. Base: 12486e0. Production branch: master.
 - Call signaling/media lifecycle tested automatically; a live two-person microphone call has not been repeated in this release.
 
 ## Deployment dependencies
-Frontend is deployed through Vercel from master. Backend changes require a manual deploy of the same commit on the existing Render service. The currently accessible Render workspace contains no services. Existing mail delivery also requires BREVO_API_KEY and a verified BREVO_FROM_EMAIL on that service. No new paid service was created.
+Frontend is deployed through Vercel from master. Both root-directory layouts carry the same security headers and rewrites. The hosting setup script preserves those headers.
+
+After push, the direct Render API and the Vercel proxy both returned version 5.0.0 with new API security headers: backend updating occurred despite the empty accessible Render workspace. Direct service settings remain inaccessible; actual auto-deploy behavior differs from the blueprint's disabled trigger. Health exposes the public Render commit revision when available to verify subsequent releases precisely. Real email delivery still requires verified BREVO_API_KEY/BREVO_FROM_EMAIL configuration and a recipient-side test. No new paid service was created.
 
 This is a bounded code and regression audit, not a volumetric DDoS exercise or a guarantee against every vulnerability. Infrastructure protection of the direct Render origin still requires its owner's account. Vercel supplies platform DDoS mitigation: https://vercel.com/docs/vercel-firewall/ddos-mitigation . Review methodology: https://cheatsheetseries.owasp.org/cheatsheets/Denial_of_Service_Cheat_Sheet.html .
