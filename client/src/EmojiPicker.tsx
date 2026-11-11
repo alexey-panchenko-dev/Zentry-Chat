@@ -65,8 +65,12 @@ export function EmojiPicker({ value, onChange, inputRef, disabled = false }: {
     {open && <div className="z-emoji-panel" style={{right:root.current?root.current.getBoundingClientRect().right-(root.current.closest('.z-workspace')?.getBoundingClientRect().right??root.current.getBoundingClientRect().right)+16:16}} role="group" aria-label="Выберите смайлик">
       <input aria-label="Найти смайлик" placeholder="Поиск смайликов…" value={search} onChange={event => { setSearch(event.target.value); setLimit(84) }} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault() }}/>
       {!search.trim() && <section className="z-emoji-frequent" aria-label="Часто используемые"><small>Часто используемые</small><div className="z-emoji-grid">{[...new Set([...Object.keys(usage).sort((a,b)=>(Number(usage[b])||0)-(Number(usage[a])||0)),...emojis])].slice(0,14).map(emoji=><button type="button" key={emoji} aria-label={`Вставить ${emoji}`} onPointerDown={event=>{if(event.pointerType==='mouse')event.preventDefault()}} onClick={()=>insert(emoji)}><Emoji emoji={emoji}/></button>)}</div></section>}
-      <div className="z-emoji-grid">{matches.slice(0, limit).map(({ emoji, name, key }) => <button type="button" key={key} aria-label={`Вставить ${emoji}`} title={name} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onClick={() => insert(emoji)}><Emoji emoji={emoji}/></button>)}</div>
-      {matches.length > limit && <button type="button" className="z-emoji-more" onClick={() => setLimit(value => value + 84)}>Ещё смайлики</button>}
+      <div className="z-emoji-grid" onScroll={event => {
+        const grid = event.currentTarget
+        if (grid.scrollHeight - grid.scrollTop - grid.clientHeight < 100 && limit < matches.length) {
+          setLimit(current => Math.min(matches.length, current + 84))
+        }
+      }}>{matches.slice(0, limit).map(({ emoji, name, key }) => <button type="button" key={key} aria-label={`Вставить ${emoji}`} title={name} onPointerDown={event => { if (event.pointerType === 'mouse') event.preventDefault() }} onClick={() => insert(emoji)}><Emoji emoji={emoji}/></button>)}</div>
       {!matches.length && <small>Ничего не найдено.</small>}
       {loadError && <small role="status">Полный набор не загрузился. Закройте и откройте панель ещё раз.</small>}
     </div>}
