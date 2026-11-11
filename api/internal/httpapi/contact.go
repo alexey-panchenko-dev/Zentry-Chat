@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
 	"newsChat/api/internal/auth"
+"newsChat/api/internal/chat"
 	"regexp"
 	"strings"
 	"unicode"
@@ -121,6 +122,7 @@ func (h *chatHandlers) setContactSettings(w http.ResponseWriter, r *http.Request
 		return
 	}
 	v, err := h.store.SetContactSettings(r.Context(), u.ID, phone, input.ShowPhone, input.ShowEmail)
+ if errors.Is(err,chat.ErrPhoneExists){writeJSON(w,409,map[string]string{"error":"phone_already_linked"});return}
 	if err != nil {
 		chatFailure(w, err)
 		return

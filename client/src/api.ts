@@ -42,6 +42,7 @@ export function errorText(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.error
     const labels: Record<string, string> = {
+      phone_already_linked: 'Этот номер уже привязан к другому аккаунту.',
       contact_blocked: 'Сообщения и звонки недоступны: контакт заблокирован.',
       invalid_birth_date: 'Для регистрации нужно указать настоящую дату рождения и быть не младше 14 лет.',
       profile_required: 'Заполните дату рождения и описание в настройках профиля.',

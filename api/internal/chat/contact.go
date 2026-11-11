@@ -6,6 +6,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+var ErrPhoneExists=errors.New("phone already linked")
+
 type ContactSettings struct {
 	Phone     string `json:"phone"`
 	ShowPhone bool   `json:"show_phone"`
@@ -64,9 +66,15 @@ func (s *Store) SetContactSettings(ctx context.Context, userID, phone string, sh
 	if phone == "" {
 		showPhone = false
 	}
+	tx,err:=s.db.Begin(ctx);if err!=nil{return ContactSettings{},err};defer tx.Rollback(context.Background())
+	if phone!="" {
+	 if _,err=tx.Exec(ctx,`SELECT pg_advisory_xact_lock(hashtextextended($1,313))`,phone);err!=nil{return ContactSettings{},err}
+	 var taken bool
+	 if err=tx.QueryRow(ctx,`SELECT EXISTS(SELECT 1 FROM profile_contacts WHERE user_id<>$1 AND regexp_replace(phone,'[^0-9]','','g')=regexp_replace($2,'[^0-9]','','g'))`,userID,phone).Scan(&taken);err!=nil{return ContactSettings{},err};if taken{return ContactSettings{},ErrPhoneExists}
+	}
 	var v ContactSettings
-	err := s.db.QueryRow(ctx, `WITH saved AS (INSERT INTO profile_contacts(user_id,phone,show_phone,show_email) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET phone=EXCLUDED.phone,show_phone=EXCLUDED.show_phone,show_email=EXCLUDED.show_email RETURNING user_id,phone,show_phone,show_email) SELECT s.phone,s.show_phone,s.show_email,u.email FROM saved s JOIN users u ON u.id=s.user_id`, userID, phone, showPhone, showEmail).Scan(&v.Phone, &v.ShowPhone, &v.ShowEmail, &v.Email)
-	return v, err
+	err = tx.QueryRow(ctx, `WITH saved AS (INSERT INTO profile_contacts(user_id,phone,show_phone,show_email) VALUES($1,$2,$3,$4) ON CONFLICT(user_id) DO UPDATE SET phone=EXCLUDED.phone,show_phone=EXCLUDED.show_phone,show_email=EXCLUDED.show_email RETURNING user_id,phone,show_phone,show_email) SELECT s.phone,s.show_phone,s.show_email,u.email FROM saved s JOIN users u ON u.id=s.user_id`, userID, phone, showPhone, showEmail).Scan(&v.Phone, &v.ShowPhone, &v.ShowEmail, &v.Email)
+	if err!=nil{return v,err};return v,tx.Commit(ctx)
 }
 func (s *Store) ContactProfile(ctx context.Context, conversationID, userID string) (ContactProfile, error) {
 	var v ContactProfile
