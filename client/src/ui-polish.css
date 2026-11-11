@@ -375,3 +375,9 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 .z-emoji-panel>.z-emoji-grid { max-height: min(280px,40dvh); overflow-y: auto; overscroll-behavior: contain; grid-auto-rows: 36px; }
 .z-emoji-grid .z-emoji { width: 26px; height: 26px; }
 .z-emoji-more { min-height: 32px; padding: 5px 9px; border: 0; border-radius: 9px; background: #ffffff08; color: var(--z-muted); font-size: 12px; }
+
+/* Readable quoted message in replies. */
+.z-bubble .z-reply-quote{display:block;width:100%;padding:10px 12px;margin:0 0 10px;border:0;border-left:3px solid #B7FF39;border-radius:8px;background:rgba(0,0,0,.2);color:#F5F3F7;text-align:left;font-size:15px;line-height:1.5;white-space:normal}
+.z-bubble .z-reply-quote>span{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;color:inherit;font-size:inherit;line-height:inherit}
+.z-bubble .z-reply-quote strong{display:block;margin-bottom:3px;color:#B7FF39;font-size:14px;font-weight:700}
+.z-bubble .z-reply-quote:hover{background:rgba(0,0,0,.28)}
