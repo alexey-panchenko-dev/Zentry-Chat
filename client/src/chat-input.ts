@@ -77,6 +77,10 @@ export function useMessageGesture<T>(onReply: (message: T) => void) {
   }
   useLayoutEffect(() => cancel, [])
   return (message: T) => ({
+    onDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
+      if ((event.target as Element).closest("button,a,video,audio,input,textarea,summary")) return
+      onReply(message)
+    },
     onContextMenu(event: React.MouseEvent<HTMLDivElement>) {
       if ((event.target as Element).closest('input,textarea,a,video,audio')) return
       const menu = event.currentTarget.querySelector<HTMLDetailsElement>('.z-message-menu')
@@ -98,13 +102,13 @@ export function useMessageGesture<T>(onReply: (message: T) => void) {
       const dx = event.clientX - start.x
       const dy = Math.abs(event.clientY - start.y)
       if (Math.abs(dx) > 10 || dy > 10) window.clearTimeout(start.timer)
-      if (dy > 18 || dx < -16) cancel()
+      if (dy > 18 || dx > 16) cancel()
     },
     onPointerUp(event: TouchEvent<HTMLDivElement>) {
       const start = gesture.current
       if (!start || start.id !== event.pointerId) return
       cancel()
-      if (event.clientX - start.x >= 54 && Math.abs(event.clientY - start.y) < 18) onReply(message)
+      if (start.x - event.clientX >= 54 && Math.abs(event.clientY - start.y) < 18) onReply(message)
     },
     onPointerCancel: cancel,
     onLostPointerCapture: cancel,
