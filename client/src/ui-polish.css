@@ -393,3 +393,7 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 
 .z-conversation-list .z-contact>span:not(.z-avatar):not(.z-group-avatar){min-width:0;overflow:hidden}
 .z-conversation-list .z-contact>span>strong,.z-conversation-list .z-contact>span>small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+.z-reaction-list button{min-height:26px;padding:3px 8px;gap:5px;font-size:12px;line-height:18px}
+.z-reaction-list .z-emoji{width:18px;height:18px;font-size:18px;vertical-align:middle}
+.z-reaction-list button>span{font-size:12px}
