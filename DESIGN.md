@@ -1,5 +1,7 @@
 # Zently visual integration
 
+> **Current status:** This document records the original visual integration and is not a complete inventory of current behavior. Zently 1.1 added privacy, message requests, reports, group roles, Web Push, PWA screens and chat reliability work. See `ZENTLY-1.1-PROGRESS.md` for verified status and deployment limits. Runtime CSS/components are authoritative where older notes below disagree.
+
 ## Intent
 Apply the user's approved Zently messenger visual identity to the existing React client. The existing Go/PostgreSQL/Pusher backend and WebRTC controller remain authoritative; media additions are authorized by docs/superpowers/plans/2026-11-06-voice-and-photos.md.
 

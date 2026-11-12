@@ -7,6 +7,7 @@ import (
 	"newsChat/api/internal/calls"
 	"newsChat/api/internal/chat"
 	"newsChat/api/internal/realtime"
+	"newsChat/api/internal/webnotify"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,11 +24,16 @@ func newRouterWithMailer(db *pgxpool.Pool, mailer codeMailer, publishers ...real
 	if len(publishers) > 0 {
 		publisher = publishers[0]
 	}
-	ch := &chatHandlers{store: chat.New(db), auth: h.service, publisher: publisher}
+	ch := &chatHandlers{push: webnotify.New(db), store: chat.New(db), auth: h.service, publisher: publisher}
 	chatMux := http.NewServeMux()
+	chatMux.HandleFunc("GET /api/push/config", ch.signedIn(ch.pushConfig))
+	chatMux.HandleFunc("POST /api/push/subscription", ch.signedIn(ch.savePush))
+	chatMux.HandleFunc("DELETE /api/push/subscription", ch.signedIn(ch.removePush))
+	chatMux.HandleFunc("POST /api/push/activity", ch.signedIn(ch.pushActivity))
 	chatMux.HandleFunc("GET /api/groups/contacts", ch.signedIn(ch.groupContacts))
 	chatMux.HandleFunc("GET /api/groups", ch.signedIn(ch.listGroups))
 	chatMux.HandleFunc("POST /api/groups", ch.signedIn(ch.createGroup))
+	chatMux.HandleFunc("POST /api/groups/{id}/manage", ch.signedIn(ch.manageGroup))
 	chatMux.HandleFunc("GET /api/groups/{id}", ch.signedIn(ch.getGroup))
 	chatMux.HandleFunc("GET /api/groups/{id}/members", ch.signedIn(ch.groupMembers))
 	chatMux.HandleFunc("GET /api/groups/{id}/photo", ch.signedIn(ch.groupPhoto))
@@ -54,6 +60,11 @@ func newRouterWithMailer(db *pgxpool.Pool, mailer codeMailer, publishers ...real
 	chatMux.HandleFunc("GET /api/conversations/{id}/profile", ch.signedIn(ch.getContactProfile))
 	chatMux.HandleFunc("PUT /api/conversations/{id}/alias", ch.signedIn(ch.setContactAlias))
 	chatMux.HandleFunc("PUT /api/profile/username", ch.signedIn(ch.setUsername))
+	chatMux.HandleFunc("POST /api/reports", ch.signedIn(ch.reportAbuse))
+	chatMux.HandleFunc("GET /api/message-requests", ch.signedIn(ch.getMessageRequests))
+	chatMux.HandleFunc("POST /api/message-requests/{id}", ch.signedIn(ch.answerMessageRequest))
+	chatMux.HandleFunc("GET /api/profile/privacy", ch.signedIn(ch.getPrivacy))
+	chatMux.HandleFunc("PUT /api/profile/privacy", ch.signedIn(ch.setPrivacy))
 	chatMux.HandleFunc("POST /api/presence", ch.signedIn(ch.touchPresence))
 	chatMux.HandleFunc("GET /api/profile", ch.signedIn(ch.getProfile))
 	chatMux.HandleFunc("PUT /api/profile", ch.signedIn(ch.updateProfile))
@@ -99,9 +110,16 @@ func newRouterWithMailer(db *pgxpool.Pool, mailer codeMailer, publishers ...real
 	chatMux.HandleFunc("POST /api/conversations/{id}/messages", ch.signedIn(ch.sendMessage))
 	chatMux.HandleFunc("GET /api/realtime/config", ch.signedIn(ch.realtimeConfig))
 	chatMux.HandleFunc("POST /api/pusher/auth", ch.signedIn(ch.pusherAuth))
-	chatMux.HandleFunc("POST /api/notes",ch.signedIn(func(w http.ResponseWriter,r *http.Request,u auth.User){ g,err:=ch.store.Notes(r.Context(),u.ID);if err!=nil{chatFailure(w,err);return};writeJSON(w,200,map[string]any{"group":g}) }))
+	chatMux.HandleFunc("POST /api/notes", ch.signedIn(func(w http.ResponseWriter, r *http.Request, u auth.User) {
+		g, err := ch.store.Notes(r.Context(), u.ID)
+		if err != nil {
+			chatFailure(w, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"group": g})
+	}))
 	protectedChat := protectAPI(chatMux, 600)
-	for _, pattern := range []string{"/api/notes","/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
+	for _, pattern := range []string{"/api/push/", "/api/reports", "/api/message-requests", "/api/message-requests/", "/api/notes", "/api/favorites", "/api/favorites/", "/api/groups", "/api/groups/", "/api/delivery", "/api/presence", "/api/profile", "/api/discovery", "/api/discovery/", "/api/unread", "/api/profile/", "/api/profiles/", "/api/messages/", "/api/users", "/api/conversations", "/api/conversations/", "/api/realtime/", "/api/pusher/", "/api/calls", "/api/calls/"} {
 		mux.Handle(pattern, protectedChat)
 	}
 	authMux := http.NewServeMux()

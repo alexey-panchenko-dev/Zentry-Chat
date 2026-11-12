@@ -6,8 +6,15 @@ import (
 	"github.com/jackc/pgx/v5"
 	"newsChat/api/internal/auth"
 	"newsChat/api/internal/contactguard"
+	"os"
 	"time"
 )
+
+const discoveryAgeSQL = "CASE WHEN p.birth_date IS NOT NULL THEN EXTRACT(YEAR FROM age(CURRENT_DATE,p.birth_date))::integer ELSE p.age END"
+
+var ErrDiscoveryMinorDisabled = errors.New("minor discovery not enabled")
+
+var ErrAgeGroupLocked = errors.New("age group cannot be changed")
 
 var ErrProfileRequired = errors.New("profile required")
 
@@ -66,12 +73,19 @@ func (s *Store) UpdateProfileWithBirthDate(ctx context.Context, id, name string,
 	if _, err = tx.Exec(ctx, `UPDATE users SET name=$2 WHERE id=$1`, id, name); err != nil {
 		return Profile{}, err
 	}
+	var oldAge *int
+	if e := tx.QueryRow(ctx, `SELECT `+discoveryAgeSQL+` FROM user_profiles p WHERE p.user_id=$1`, id).Scan(&oldAge); e != nil && !errors.Is(e, pgx.ErrNoRows) {
+		return Profile{}, e
+	}
 	if _, err = tx.Exec(ctx, `INSERT INTO user_profiles(user_id,age,bio,city,birth_date) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET age=EXCLUDED.age,bio=EXCLUDED.bio,city=EXCLUDED.city,birth_date=COALESCE(EXCLUDED.birth_date,user_profiles.birth_date)`, id, age, bio, city, date); err != nil {
 		return Profile{}, err
 	}
 	p, err := scanProfile(tx.QueryRow(ctx, `SELECT `+profileColumns+` FROM users u LEFT JOIN user_profiles p ON p.user_id=u.id WHERE u.id=$1`, id))
 	if err != nil {
 		return p, err
+	}
+	if oldAge != nil && *oldAge >= 14 && p.Age != nil && (*oldAge >= 18) != (*p.Age >= 18) {
+		return Profile{}, ErrAgeGroupLocked
 	}
 	return p, tx.Commit(ctx)
 }
@@ -80,14 +94,17 @@ func (s *Store) Discovery(ctx context.Context, id string, incoming bool) ([]Prof
 	if err != nil {
 		return nil, err
 	}
-	if p.Age == nil || p.Bio == "" {
+	if p.Age == nil || *p.Age < 14 || p.Bio == "" {
 		return nil, ErrProfileRequired
+	}
+	if *p.Age < 18 && os.Getenv("DISCOVERY_MINORS_ENABLED") != "true" {
+		return nil, ErrDiscoveryMinorDisabled
 	}
 	filter := `NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id AND (v.liked OR v.updated_at>now()-interval '7 days'))`
 	if incoming {
 		filter = `EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=u.id AND v.target_id=$1 AND v.liked) AND NOT EXISTS(SELECT 1 FROM discovery_votes v WHERE v.actor_id=$1 AND v.target_id=u.id)`
 	}
-	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.email_verified=true AND u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id)
+	rows, err := s.db.Query(ctx, `SELECT `+profileColumns+` FROM users u JOIN user_profiles p ON p.user_id=u.id WHERE u.email_verified=true AND u.id<>$1 AND (p.age IS NOT NULL OR p.birth_date IS NOT NULL) AND p.bio<>'' AND (`+discoveryAgeSQL+`)>=14 AND ((`+discoveryAgeSQL+`)>=18)=$2 AND NOT EXISTS(SELECT 1 FROM discovery_matches m WHERE m.user_low=LEAST($1::uuid,u.id) AND m.user_high=GREATEST($1::uuid,u.id)) AND `+filter+` ORDER BY u.id LIMIT 30`, id, *p.Age >= 18)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +148,18 @@ func (s *Store) Vote(ctx context.Context, actor, target string, liked bool) (str
 		if err != nil {
 			return "", err
 		}
+	}
+	var compatible bool
+	var youngest int
+	err = tx.QueryRow(ctx, `SELECT count(*)=2 AND min(CASE WHEN effective_age>=18 THEN 1 ELSE 0 END)=max(CASE WHEN effective_age>=18 THEN 1 ELSE 0 END) AND min(effective_age)>=14,COALESCE(min(effective_age),0) FROM (SELECT `+discoveryAgeSQL+` AS effective_age FROM user_profiles p WHERE p.user_id IN ($1::uuid,$2::uuid)) ages`, actor, target).Scan(&compatible, &youngest)
+	if err != nil {
+		return "", err
+	}
+	if !compatible {
+		return "", ErrNotFound
+	}
+	if youngest < 18 && os.Getenv("DISCOVERY_MINORS_ENABLED") != "true" {
+		return "", ErrDiscoveryMinorDisabled
 	}
 	var existing string
 	err = tx.QueryRow(ctx, `SELECT conversation_id::text FROM discovery_matches WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid)`, actor, target).Scan(&existing)

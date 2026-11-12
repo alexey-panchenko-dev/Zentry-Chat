@@ -48,7 +48,7 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		!validPassword(input.Password) {
 		writeJSON(w, 400, map[string]string{
 			"error":   "invalid_input",
-			"message": "Нужны @юзер, почта и пароль длиной 6–16 символов: латинские строчные и заглавные буквы, цифра и один из символов & * $ %",
+			"message": "Нужны @юзер, почта и пароль длиной 6–32 символов: латинские строчные и заглавные буквы, цифра и один из символов & * $ %",
 		})
 		return
 	}
@@ -341,7 +341,7 @@ func normalizedEmail(value string) (string, bool) {
 }
 
 func validPassword(value string) bool {
-	if !utf8.ValidString(value) || len(value) < 6 || len(value) > 16 {
+	if !utf8.ValidString(value) || len(value) < 6 || len(value) > 32 {
 		return false
 	}
 	var lower, upper, digit, special bool
