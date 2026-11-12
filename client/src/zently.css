@@ -113,7 +113,11 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .z-reaction-list button span{font-size:10px;color:var(--z-muted)}
 .z-reply-quote{display:flex;align-items:center;gap:6px;width:100%;max-width:100%;overflow:hidden;margin:0 0 7px;padding:5px 8px;border:0;border-left:2px solid var(--z-lime);border-radius:4px;background:#0002;color:var(--z-muted);text-align:left;font-size:11px}
 .z-reply-quote span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.z-forward-label,.z-edited-label{display:inline-flex;align-items:center;gap:4px;margin:0 0 4px;color:var(--z-muted);font-size:10px}
+.z-forward-label,.z-edited-label{display:inline-flex;align-items:center;gap:4px;margin:0 0 4px;color:#c4b6c7;font-size:12px}
+.z-bubble:has(>p.z-emoji-only){min-width:0;padding:8px 10px 6px}
+.z-bubble>p.z-emoji-only{font-size:40px;line-height:1.1;white-space:normal}
+.z-bubble>p.z-emoji-only .z-emoji{width:1em;height:1em;vertical-align:middle}
+.z-bubble:has(>p.z-emoji-only) .z-message-meta{margin-top:4px}
 .z-edit-message{display:grid;grid-template-columns:1fr auto auto;gap:5px;width:min(360px,75vw)}
 .z-edit-message textarea{grid-column:1/-1;min-height:55px;background:#211c23;border-radius:10px}
 .z-edit-message button,.z-message-menu-items button{font-size:11px}
@@ -624,3 +628,4 @@ input,textarea,select{transition:border-color var(--z-motion-ui) ease,box-shadow
 .z-chat-row[data-pinned=true]{order:-1}
 
 /* Keep message actions inside the scrolling history, including the first message. */
+
