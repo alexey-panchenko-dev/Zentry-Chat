@@ -17,3 +17,9 @@ export function emojiParts(text: string): { text: string; key: string | null }[]
   }
   return parts
 }
+
+export function isSingleEmoji(text: string): boolean {
+  const parts = emojiParts(text.trim())
+  return parts.length === 1 && parts[0].key !== null
+}
+
