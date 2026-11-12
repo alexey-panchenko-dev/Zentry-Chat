@@ -387,6 +387,13 @@ body:has(.z-shell[data-motion=reduced]) .z-action-popup { animation: none; }
 
 .z-conversation-list>.z-chat-row+.z-chat-row{border-top:1px solid rgba(166,164,174,.16);margin-top:5px;padding-top:5px}
 .z-conversation-list .z-group-avatar{width:52px;height:52px;flex:0 0 52px;border:0;background:#302531;color:#c8b7c5;border-radius:50%;box-shadow:none}
+.z-link-warning{display:grid;gap:14px;width:min(430px,calc(100vw - 28px));max-height:calc(100dvh - 32px);margin:auto;padding:20px;border:1px solid var(--z-line);border-radius:18px;background:#211b25;color:var(--z-text);box-shadow:0 18px 60px #0009}
+.z-link-warning::backdrop{background:#000a;backdrop-filter:blur(5px)}
+.z-link-warning h2{margin:0;font-size:18px}
+.z-link-warning p{margin:0;color:var(--z-muted);font-size:13px;line-height:1.6}
+.z-link-warning-url{display:block;max-height:90px;overflow:auto;overflow-wrap:anywhere;padding:10px;border-radius:10px;background:#ffffff08;color:#f2d2e3;font-size:12px}
+.z-link-warning>div{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.z-link-warning-mark{color:#f0bb5d}
 .z-conversation-list .z-group-avatar:has(>.z-notes-avatar-logo){display:grid;place-items:center;overflow:hidden;border-radius:50%}
 .z-conversation-list .z-group-avatar>.z-notes-avatar-logo{position:static!important;inset:auto!important;display:block;width:30px!important;height:27px!important;min-width:0;max-width:30px;object-fit:contain!important;border-radius:0;transform:none!important;margin:0;flex:none}
 
