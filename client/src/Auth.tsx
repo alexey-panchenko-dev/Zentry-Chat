@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { api, errorText } from './api'
 import type { User } from './api'
 import { Brand } from './Visual'
@@ -27,6 +27,7 @@ export default function Auth() {
   const [remember, setRemember] = useState(true)
   const [savedAccounts] = useState(rememberedAccounts)
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [code, setCode] = useState('')
   const [authNotice, setAuthNotice] = useState('')
   const [resendSeconds, setResendSeconds] = useState(0)
@@ -94,7 +95,12 @@ export default function Auth() {
     : mode==='verify'&&resendMutation.isError ? errorText(resendMutation.error)
     : mode==='reset'&&resetRequestMutation.isError ? errorText(resetRequestMutation.error) : ''
   return <section className="z-auth-card">
-    <Brand/><p className="z-eyebrow">БЛИЖЕ ДРУГ К ДРУГУ</p><h1>{mode==='register' ? <>Твой круг.<br/>Твои разговоры.</> : mode==='verify'?<>Подтверди<br/>свою почту.</>:mode==='forgot'||mode==='reset'?<>Вернёмся<br/>в Zently.</>:<>С возвращением<br/>в Zently.</>}</h1>
+    <Brand/>
+    {(mode==='login'||mode==='register')&&<div className="z-auth-mode-tabs" role="group" aria-label="Выбор действия">
+      <button type="button" aria-pressed={mode==='login'} onClick={()=>{setMode('login');setPassword('');setShowPassword(false);setValidation(null);setAuthNotice('');auth.reset();registerMutation.reset()}}>Войти</button>
+      <button type="button" aria-pressed={mode==='register'} onClick={()=>{setMode('register');setPassword('');setShowPassword(false);setValidation(null);setAuthNotice('');auth.reset();registerMutation.reset()}}>Зарегистрироваться</button>
+    </div>}
+    <p className="z-eyebrow">БЛИЖЕ ДРУГ К ДРУГУ</p><h1>{mode==='register' ? <>Твой круг.<br/>Твои разговоры.</> : mode==='verify'?<>Подтверди<br/>свою почту.</>:mode==='forgot'||mode==='reset'?<>Вернёмся<br/>в Zently.</>:<>С возвращением<br/>в Zently.</>}</h1>
     <p className="z-muted">{modeTitle}</p>
     <form noValidate className="z-auth-form" onSubmit={submitAuth}>
       {mode==='register' && <label>Ник / @юзер<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={41} value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" placeholder="Например, byliver" /></label>}
@@ -102,7 +108,7 @@ export default function Auth() {
       {mode!=='verify'&&<label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" readOnly={mode==='reset'} /></label>}
       {mode==='verify'&&<p className="z-field-help">Код подтверждения для <strong>{email}</strong> действует 10 минут.</p>}
       {mode==='login' && savedAccounts.length > 0 && <div className="z-saved-accounts" aria-label="Запомненные аккаунты">{savedAccounts.map(account => <button type="button" className="secondary" key={account} onClick={() => setEmail(account)}>{account}</button>)}</div>}
-      {(mode==='login'||mode==='register'||mode==='reset')&&<label>{mode==='reset'?'Новый пароль':'Пароль'}<input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type="password" required minLength={mode==='login'?1:passwordMinimum} maxLength={mode==='login'?72:16} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register||mode==='reset' ? 'new-password' : 'current-password'} placeholder={mode==='login'?'Введите пароль':`${passwordMinimum}–16 символов, A–Z, a–z, 0–9, & * $ %`} /></label>}
+      {(mode==='login'||mode==='register'||mode==='reset')&&<label>{mode==='reset'?'Новый пароль':'Пароль'}<span className="z-password-wrap"><input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type={showPassword?'text':'password'} required minLength={mode==='login'?1:passwordMinimum} maxLength={mode==='login'?72:16} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register||mode==='reset' ? 'new-password' : 'current-password'} placeholder={mode==='login'?'Введите пароль':`${passwordMinimum}–16 символов, A–Z, a–z, 0–9, & * $ %`} /><button className="z-password-visibility" type="button" aria-label={showPassword?'Скрыть пароль':'Показать пароль'} aria-pressed={showPassword} onClick={()=>setShowPassword(visible=>!visible)}>{showPassword?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button></span></label>}
       {(mode==='verify'||mode==='reset')&&<label>Код из письма<input name="code" aria-invalid={validation?.field==='code'} aria-describedby={validation?.field==='code'?'auth-validation':undefined} inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" required value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="000000" /></label>}
       {mode==='login'&&<label className="z-remember-account"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)}/> Запомнить почту на этом устройстве</label>}
       {(mode==='register'||mode==='reset')&&<p className="z-field-help">{passwordMinimum}–16 символов: латинские строчные и заглавные буквы, цифра и один из символов &amp; * $ %.</p>}
@@ -117,6 +123,5 @@ export default function Auth() {
     {mode==='login'&&<button className="z-auth-switch" onClick={()=>{setMode('forgot');setValidation(null);setAuthNotice('')}}>Забыли пароль?</button>}
     {mode==='verify'&&<button className="z-auth-switch" onClick={()=>{setMode('register');setValidation(null);setAuthNotice('')}}>Изменить данные регистрации</button>}
     {mode==='reset'&&<button className="z-auth-switch" onClick={()=>{setMode('login');setValidation(null);setAuthNotice('')}}>Вернуться ко входу</button>}
-    {(mode==='login'||mode==='register')&&<button className="z-auth-switch" onClick={() => { setMode(register?'login':'register'); setValidation(null); setAuthNotice(''); auth.reset();registerMutation.reset() }}>{register ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Создать профиль'}</button>}
   </section>
 }
