@@ -42,6 +42,13 @@ export function errorText(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const code = error.response?.data?.error
     const labels: Record<string, string> = {
+      discovery_adults_only: 'Знакомства пока доступны только с 18 лет. Чаты и звонки доступны с 14 лет.',
+      age_group_locked: 'Изменение даты не должно переводить аккаунт между взрослой и несовершеннолетней группами.',
+      report_limit: 'Можно подать до пяти новых жалоб за сутки. Попробуйте позже.',
+      push_device_limit: 'Для push-уведомлений можно подключить не больше 20 устройств. Отключите старое устройство и попробуйте снова.',
+      push_unavailable: 'Push-уведомления пока не настроены на сервере.',
+      invalid_report: 'Проверьте причину и текст жалобы.',
+      privacy_restricted: 'Настройки приватности собеседника ограничивают это действие.',
       phone_already_linked: 'Этот номер уже привязан к другому аккаунту.',
       contact_blocked: 'Сообщения и звонки недоступны: контакт заблокирован.',
       invalid_birth_date: 'Для регистрации нужно указать настоящую дату рождения и быть не младше 14 лет.',
