@@ -10,7 +10,7 @@ import { parseBirthDate, birthDatesSupported } from './birthdays'
 import { rememberedAccounts, rememberAccount } from './accounts'
 
 const newPasswordIsValid = (value: string, minimum: number) =>
-  value.length >= minimum && value.length <= 16 &&
+  value.length >= minimum && value.length <= 32 &&
   /^[A-Za-z0-9&*$%]+$/.test(value) &&
   /[a-z]/.test(value) && /[A-Z]/.test(value) && /[0-9]/.test(value) && /[&*$%]/.test(value)
 
@@ -78,7 +78,7 @@ export default function Auth() {
       let message=''
       if(field.name==='name'&&!/^@?[a-z][a-z0-9_]{2,39}$/i.test(field.value.trim()))message='Придумайте @юзер: 3–40 символов, латинские буквы, цифры и _.'
       else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например you@example.com.'
-      else if(field.name==='password'&&mode!=='login'&&!newPasswordIsValid(field.value,passwordMinimum))message=`Пароль: ${passwordMinimum}–16 символов, латинские строчные и заглавные буквы, цифра и один из символов & * $ %.`
+      else if(field.name==='password'&&mode!=='login'&&!newPasswordIsValid(field.value,passwordMinimum))message=`Пароль: ${passwordMinimum}–32 символов, латинские строчные и заглавные буквы, цифра и один из символов & * $ %.`
       else if(field.name==='code'&&!/^\d{6}$/.test(field.value))message='Введите шестизначный код из письма.'
       if(message){setValidation({field:field.name,message});field.focus();return}
     }
@@ -91,14 +91,23 @@ export default function Auth() {
     else auth.mutate()
   }
   const modeTitle = mode==='register'?'Создай профиль и будь на связи.':mode==='verify'?'Проверь почту и введи код.':mode==='forgot'?'Восстановим доступ к аккаунту.':mode==='reset'?'Задай новый пароль.':'Войди, чтобы продолжить разговор.'
+  const selectAuthMode = (next: 'login'|'register') => {
+    setMode(next)
+    setPassword('')
+    setShowPassword(false)
+    setValidation(null)
+    setAuthNotice('')
+    auth.reset()
+    registerMutation.reset()
+  }
   const requestError = activeMutation.isError ? errorText(activeMutation.error)
     : mode==='verify'&&resendMutation.isError ? errorText(resendMutation.error)
     : mode==='reset'&&resetRequestMutation.isError ? errorText(resetRequestMutation.error) : ''
   return <section className="z-auth-card">
     <Brand/>
     {(mode==='login'||mode==='register')&&<div className="z-auth-mode-tabs" role="group" aria-label="Выбор действия">
-      <button type="button" aria-pressed={mode==='login'} onClick={()=>{setMode('login');setPassword('');setShowPassword(false);setValidation(null);setAuthNotice('');auth.reset();registerMutation.reset()}}>Войти</button>
-      <button type="button" aria-pressed={mode==='register'} onClick={()=>{setMode('register');setPassword('');setShowPassword(false);setValidation(null);setAuthNotice('');auth.reset();registerMutation.reset()}}>Зарегистрироваться</button>
+      <button type="button" aria-pressed={mode==='login'} onClick={()=>selectAuthMode('login')}>Войти</button>
+      <button type="button" aria-pressed={mode==='register'} onClick={()=>selectAuthMode('register')}>Зарегистрироваться</button>
     </div>}
     <p className="z-eyebrow">БЛИЖЕ ДРУГ К ДРУГУ</p><h1>{mode==='register' ? <>Твой круг.<br/>Твои разговоры.</> : mode==='verify'?<>Подтверди<br/>свою почту.</>:mode==='forgot'||mode==='reset'?<>Вернёмся<br/>в Zently.</>:<>С возвращением<br/>в Zently.</>}</h1>
     <p className="z-muted">{modeTitle}</p>
@@ -108,10 +117,10 @@ export default function Auth() {
       {mode!=='verify'&&<label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" readOnly={mode==='reset'} /></label>}
       {mode==='verify'&&<p className="z-field-help">Код подтверждения для <strong>{email}</strong> действует 10 минут.</p>}
       {mode==='login' && savedAccounts.length > 0 && <div className="z-saved-accounts" aria-label="Запомненные аккаунты">{savedAccounts.map(account => <button type="button" className="secondary" key={account} onClick={() => setEmail(account)}>{account}</button>)}</div>}
-      {(mode==='login'||mode==='register'||mode==='reset')&&<label>{mode==='reset'?'Новый пароль':'Пароль'}<span className="z-password-wrap"><input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type={showPassword?'text':'password'} required minLength={mode==='login'?1:passwordMinimum} maxLength={mode==='login'?72:16} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={register||mode==='reset' ? 'new-password' : 'current-password'} placeholder={mode==='login'?'Введите пароль':`${passwordMinimum}–16 символов, A–Z, a–z, 0–9, & * $ %`} /><button className="z-password-visibility" type="button" aria-label={showPassword?'Скрыть пароль':'Показать пароль'} aria-pressed={showPassword} onClick={()=>setShowPassword(visible=>!visible)}>{showPassword?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button></span></label>}
+      {(mode==='login'||mode==='register'||mode==='reset')&&<label>{mode==='reset'?'Новый пароль':'Пароль'}<span className="z-password-wrap"><input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type={showPassword?'text':'password'} required minLength={mode==='login'?1:passwordMinimum} maxLength={mode==='login'?72:32} value={password} onChange={(e) => setPassword(e.target.value.replace(/\s/g,''))} autoComplete={register||mode==='reset' ? 'new-password' : 'current-password'} placeholder={mode==='login'?'Введите пароль':`${passwordMinimum}–32 символов, A–Z, a–z, 0–9, & * $ %`} /><button className="z-password-visibility" type="button" aria-label={showPassword?'Скрыть пароль':'Показать пароль'} aria-pressed={showPassword} onClick={()=>setShowPassword(visible=>!visible)}>{showPassword?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button></span></label>}
       {(mode==='verify'||mode==='reset')&&<label>Код из письма<input name="code" aria-invalid={validation?.field==='code'} aria-describedby={validation?.field==='code'?'auth-validation':undefined} inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" required value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="000000" /></label>}
       {mode==='login'&&<label className="z-remember-account"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)}/> Запомнить почту на этом устройстве</label>}
-      {(mode==='register'||mode==='reset')&&<p className="z-field-help">{passwordMinimum}–16 символов: латинские строчные и заглавные буквы, цифра и один из символов &amp; * $ %.</p>}
+      {(mode==='register'||mode==='reset')&&<p className="z-field-help">{passwordMinimum}–32 символов: латинские строчные и заглавные буквы, цифра и один из символов &amp; * $ %.</p>}
       {validation&&<p id="auth-validation" className="notice" role="alert">{validation.message}</p>}
       {requestError && <p className="notice" role="alert">{requestError}</p>}
       {authNotice && <p className="notice" role="status">{authNotice}</p>}
@@ -125,3 +134,4 @@ export default function Auth() {
     {mode==='reset'&&<button className="z-auth-switch" onClick={()=>{setMode('login');setValidation(null);setAuthNotice('')}}>Вернуться ко входу</button>}
   </section>
 }
+
