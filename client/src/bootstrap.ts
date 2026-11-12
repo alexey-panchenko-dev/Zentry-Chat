@@ -1,3 +1,5 @@
+import {startPwa} from './pwa'
+startPwa()
 import { startSessionRequest } from './startup-session'
 
 void startSessionRequest().then(user => {

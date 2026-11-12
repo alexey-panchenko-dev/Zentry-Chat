@@ -1,3 +1,4 @@
+import { ReportButton } from './ReportButton'
 import { formatBirthDate, parseBirthDate, ageFromBirthDate, birthdayLabel, birthDatesSupported } from './birthdays'
 import { BirthDateWheel } from './BirthDateWheel'
 import { useEffect, useRef, useState } from 'react'
@@ -67,7 +68,7 @@ function ProfileForm({ profile,onSaved }: {profile: Profile;onSaved?:()=>void}) 
   }
   return <form ref={form} noValidate className="z-profile-form" onSubmit={submit}>
     <div className="z-birth-date-field"><div><label>Дата рождения</label><BirthDateWheel value={birthDate} onChange={setBirthDate} invalid={validation?.field==='birth_date'} describedBy={validation?.field==='birth_date'?'profile-validation':'birth-date-help'}/></div><button className="secondary" type="submit" disabled={save.isPending||!birthDatesReady||birthDate===formatBirthDate(profile.birth_date)}>Подтвердить дату</button></div>
-    <p id="birth-date-help" className="z-field-help">Дата рождения, включая год, видна собеседникам. Возраст рассчитывается автоматически.</p>
+    <p id="birth-date-help" className="z-field-help">Видимость даты рождения настраивается в конфиденциальности. Возраст рассчитывается автоматически.</p>
     {age!=null&&<p className="z-muted">Возраст: {age}{birthday&&<> · День рождения: {birthday.label}{birthday.today?' · Сегодня 🎉':''}</>}</p>}
     <label>О себе<textarea name="bio" className="resize-none" value={bio} onChange={e=>setBio(e.target.value)} rows={3} aria-invalid={validation?.field==='bio'} aria-describedby={validation?.field==='bio'?'profile-validation':'bio-help'} /><small id="bio-help">{Array.from(bio).length}/100 символов</small></label>
     {validation&&<p id="profile-validation" className="notice" role="alert">{validation.message}</p>}
@@ -113,7 +114,7 @@ export function Discovery({ onSettings, fallbackInterval }: { onSettings: () => 
   })
   const castVote=(person:Profile,liked:boolean)=>{if(vote.isPending||swipe||swipeTimer.current!==null)return;setSwipe(liked?'like':'skip');swipeTimer.current=window.setTimeout(()=>{swipeTimer.current=null;vote.mutate({id:person.id,liked})},420)}
   const actions = (person: Profile) => <div className="z-discovery-actions"><button className="z-skip" disabled={vote.isPending||!!swipe} aria-label="Не подходит" onClick={()=>castVote(person,false)}><X size={30}/></button><button className="z-like" disabled={vote.isPending||!!swipe} aria-label="Нравится" onClick={()=>castVote(person,true)}><Check size={30}/></button></div>
-  const card = (person: Profile) => <article key={person.id} className={'z-discovery-card'+(swipe?' is-leaving-'+swipe:'')}><DiscoveryPhoto key={person.id} user={person}/><div className="z-discovery-details"><h2>{person.name}, {person.age}</h2>{person.city&&<p className="z-muted">{person.city}</p>}<p className="z-discovery-bio">{person.bio}</p></div>{actions(person)}</article>
+  const card = (person: Profile) => <article key={person.id} className={'z-discovery-card'+(swipe?' is-leaving-'+swipe:'')}><DiscoveryPhoto key={person.id} user={person}/><div className="z-discovery-details"><h2>{person.name}, {person.age}</h2>{person.city&&<p className="z-muted">{person.city}</p>}<p className="z-discovery-bio">{person.bio}</p></div>{actions(person)}<ReportButton userID={person.id} scope="discovery"/></article>
   const active = tab==='cards'?cards:likes
   return <section className="z-discovery"><header className="z-discovery-header"><h1><Heart/> Знакомства</h1>
     {ready&&<div className="z-discovery-tabs"><button className={tab==='cards'?'is-active':''} onClick={()=>{setTab('cards');setExpanded(null);setSwipe(null)}}>Люди</button><button className={tab==='likes'?'is-active':''} onClick={()=>{setTab('likes');setExpanded(null);setSwipe(null)}}>Входящие лайки</button></div>}

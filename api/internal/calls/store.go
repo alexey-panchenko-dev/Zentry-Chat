@@ -17,16 +17,16 @@ var ErrBusy = errors.New("participant busy")
 var ErrConflict = errors.New("idempotency key conflict")
 
 type Call struct {
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	CallerID       string    `json:"caller_id"`
-	CalleeID       string    `json:"callee_id"`
-	ClientCallID   string    `json:"client_call_id"`
-	Status         string    `json:"status"`
-	Version        int       `json:"version"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	ExpiresAt      time.Time `json:"expires_at"`
+	ID             string     `json:"id"`
+	ConversationID string     `json:"conversation_id"`
+	CallerID       string     `json:"caller_id"`
+	CalleeID       string     `json:"callee_id"`
+	ClientCallID   string     `json:"client_call_id"`
+	Status         string     `json:"status"`
+	Version        int        `json:"version"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	ExpiresAt      time.Time  `json:"expires_at"`
 	AcceptedAt     *time.Time `json:"accepted_at,omitempty"`
 }
 
@@ -119,6 +119,13 @@ func (s *Store) Create(ctx context.Context, convID, userID, clientID string) (Ca
 	}
 	if err = contactguard.CheckBlocked(ctx, tx, userID, peer); err != nil {
 		return Call{}, false, err
+	}
+	allowed, privacyErr := contactguard.Allowed(ctx, tx, peer, userID, "calls")
+	if privacyErr != nil {
+		return Call{}, false, privacyErr
+	}
+	if !allowed {
+		return Call{}, false, contactguard.ErrPrivacy
 	}
 	if err := expire(ctx, tx); err != nil {
 		return Call{}, false, err

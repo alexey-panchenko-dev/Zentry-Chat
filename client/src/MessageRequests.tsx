@@ -1,0 +1,11 @@
+import { ReportButton } from './ReportButton'
+import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query'
+import {api,errorText} from './api'
+import type {Conversation} from './api'
+import {Avatar} from './Visual'
+export function MessageRequests({onOpen}:{onOpen:(conversation:Conversation)=>void}){
+ const cache=useQueryClient()
+ const requests=useQuery({queryKey:['message-requests'],queryFn:async()=>(await api.get<{conversations:Conversation[]}>('/message-requests')).data.conversations,retry:false,refetchInterval:30_000})
+ const answer=useMutation({mutationFn:async({id,action}:{id:string;action:string})=>{if(action==='block')await api.post(`/conversations/${id}/controls`,{action:'block'});await api.post(`/message-requests/${id}`,{action:action==='block'?'declined':action})},onSuccess:()=>{void cache.invalidateQueries({queryKey:['message-requests']});void cache.invalidateQueries({queryKey:['conversations']});void cache.invalidateQueries({queryKey:['unread']})}})
+ return <section className="z-requests"><p className="z-muted">Первое сообщение от незнакомого человека. Примите запрос, чтобы продолжить.</p>{requests.isPending&&<p role="status">Загружаем запросы…</p>}{requests.isError&&<p className="notice" role="alert">{errorText(requests.error)} <button type="button" onClick={()=>void requests.refetch()}>Повторить</button></p>}{requests.data?.length===0&&<p>Запросов пока нет.</p>}{requests.data?.map(chat=><article key={chat.id}><button className="z-request-preview" type="button" onClick={()=>onOpen(chat)}><Avatar user={chat.participant}/><span><strong>{chat.participant.name}</strong><small>{chat.last_message?.slice(0,120)||'Вложение'}</small></span></button><div className="z-request-actions"><button type="button" className="primary" disabled={answer.isPending} onClick={()=>answer.mutate({id:chat.id,action:'accepted'})}>Принять</button><button type="button" className="secondary" disabled={answer.isPending} onClick={()=>answer.mutate({id:chat.id,action:'declined'})}>Отклонить</button><button type="button" className="secondary" disabled={answer.isPending} onClick={()=>answer.mutate({id:chat.id,action:'block'})}>Заблокировать</button><ReportButton userID={chat.participant.id}/></div></article>)}{answer.isError&&<p className="notice" role="alert">{errorText(answer.error)}</p>}</section>
+}

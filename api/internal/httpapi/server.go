@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+	"newsChat/api/internal/webnotify"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,7 +13,7 @@ import (
 )
 
 func NewServer(cfg config.Config, db *pgxpool.Pool, publisher realtime.Publisher) *http.Server {
-	return &http.Server{
+	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           boundedRequests(newRouter(db, publisher)),
 		MaxHeaderBytes:    32 * 1024,
@@ -20,4 +22,8 @@ func NewServer(cfg config.Config, db *pgxpool.Pool, publisher realtime.Publisher
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go webnotify.New(db).Run(ctx)
+	server.RegisterOnShutdown(cancel)
+	return server
 }

@@ -13,12 +13,14 @@ import (
 	"newsChat/api/internal/auth"
 	"newsChat/api/internal/chat"
 	"newsChat/api/internal/realtime"
+	"newsChat/api/internal/webnotify"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 var socketPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 type chatHandlers struct {
+	push      *webnotify.Service
 	budget    accountBudget
 	store     *chat.Store
 	auth      *auth.Service
@@ -293,6 +295,18 @@ func pagination(w http.ResponseWriter, r *http.Request) (int64, int, bool) {
 }
 
 func chatFailure(w http.ResponseWriter, err error) {
+	if errors.Is(err, chat.ErrDiscoveryMinorDisabled) {
+		writeJSON(w, 403, map[string]string{"error": "discovery_adults_only"})
+		return
+	}
+	if errors.Is(err, chat.ErrAgeGroupLocked) {
+		writeJSON(w, 403, map[string]string{"error": "age_group_locked"})
+		return
+	}
+	if errors.Is(err, chat.ErrPrivacy) {
+		writeJSON(w, 403, map[string]string{"error": "privacy_restricted"})
+		return
+	}
 	if errors.Is(err, chat.ErrBlocked) {
 		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
 		return

@@ -10,35 +10,36 @@ import (
 var ErrGroupMembers = errors.New("select at least two contacts")
 
 type Group struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	OwnerID     string    `json:"owner_id"`
-	MemberCount int       `json:"member_count"`
-	AvatarURL   string    `json:"avatar_url,omitempty"`
-	MessageCount int64    `json:"message_count"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Role         string    `json:"role"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	OwnerID      string    `json:"owner_id"`
+	MemberCount  int       `json:"member_count"`
+	AvatarURL    string    `json:"avatar_url,omitempty"`
+	MessageCount int64     `json:"message_count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 type GroupMessage struct {
-	Reactions []ReactionCount `json:"reactions"`
-	AttachmentSize int `json:"attachment_size,omitempty"`
-	ID              string    `json:"id"`
-	GroupID         string    `json:"group_id"`
-	SenderID        string    `json:"sender_id"`
-	SenderName      string    `json:"sender_name"`
-	ClientMessageID string    `json:"client_message_id"`
-	Body            string    `json:"body"`
-	CreatedAt       time.Time `json:"created_at"`
-	Kind            string    `json:"kind,omitempty"`
-	ImageURL        string    `json:"image_url,omitempty"`
-	ReplyToID       string    `json:"reply_to_id,omitempty"`
-	ReplyBody       string    `json:"reply_body,omitempty"`
-		ReplySenderName string    `json:"reply_sender_name,omitempty"`
-	EditedAt        *time.Time `json:"edited_at,omitempty"`
-	ForwardedFromID string    `json:"forwarded_from_id,omitempty"`
-	AttachmentURL   string    `json:"attachment_url,omitempty"`
-	AttachmentName  string    `json:"attachment_name,omitempty"`
-	AttachmentMIME  string    `json:"attachment_mime,omitempty"`
+	Reactions       []ReactionCount `json:"reactions"`
+	AttachmentSize  int             `json:"attachment_size,omitempty"`
+	ID              string          `json:"id"`
+	GroupID         string          `json:"group_id"`
+	SenderID        string          `json:"sender_id"`
+	SenderName      string          `json:"sender_name"`
+	ClientMessageID string          `json:"client_message_id"`
+	Body            string          `json:"body"`
+	CreatedAt       time.Time       `json:"created_at"`
+	Kind            string          `json:"kind,omitempty"`
+	ImageURL        string          `json:"image_url,omitempty"`
+	ReplyToID       string          `json:"reply_to_id,omitempty"`
+	ReplyBody       string          `json:"reply_body,omitempty"`
+	ReplySenderName string          `json:"reply_sender_name,omitempty"`
+	EditedAt        *time.Time      `json:"edited_at,omitempty"`
+	ForwardedFromID string          `json:"forwarded_from_id,omitempty"`
+	AttachmentURL   string          `json:"attachment_url,omitempty"`
+	AttachmentName  string          `json:"attachment_name,omitempty"`
+	AttachmentMIME  string          `json:"attachment_mime,omitempty"`
 }
 
 func (s *Store) GroupContacts(ctx context.Context, user string) ([]PublicUser, error) {
@@ -84,10 +85,11 @@ func (s *Store) CreateGroup(ctx context.Context, owner, name string, peers []str
 		return g, nil, err
 	}
 	g.MemberCount = len(peers) + 1
+	g.Role = "owner"
 	return g, append([]string{owner}, peers...), tx.Commit(ctx)
 }
 func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
-	rows, err := s.db.Query(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE m.user_id=$1 ORDER BY g.updated_at DESC LIMIT 200`, user)
+	rows, err := s.db.Query(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id),CASE WHEN g.owner_id=m.user_id THEN 'owner' ELSE m.role END FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE m.user_id=$1 ORDER BY g.updated_at DESC LIMIT 200`, user)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +97,7 @@ func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
 	out := []Group{}
 	for rows.Next() {
 		var g Group
-		if err = rows.Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount); err != nil {
+		if err = rows.Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount, &g.Role); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -104,25 +106,31 @@ func (s *Store) Groups(ctx context.Context, user string) ([]Group, error) {
 }
 func (s *Store) Group(ctx context.Context, id, user string) (Group, error) {
 	var g Group
-	err := s.db.QueryRow(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id) FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE g.id=$1 AND m.user_id=$2`, id, user).Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount)
+	err := s.db.QueryRow(ctx, `SELECT g.id::text,g.name,g.owner_id::text,g.created_at,g.updated_at,(SELECT count(*) FROM group_members WHERE group_id=g.id),COALESCE((SELECT '/api/groups/'||g.id::text||'/photo?v='||g.avatar_revision::text WHERE g.avatar IS NOT NULL),''),(SELECT count(*) FROM group_messages WHERE group_id=g.id),CASE WHEN g.owner_id=m.user_id THEN 'owner' ELSE m.role END FROM group_chats g JOIN group_members m ON m.group_id=g.id WHERE g.id=$1 AND m.user_id=$2`, id, user).Scan(&g.ID, &g.Name, &g.OwnerID, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount, &g.AvatarURL, &g.MessageCount, &g.Role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = ErrNotFound
 	}
 	return g, err
 }
-func (s *Store) GroupMembers(ctx context.Context, id, user string) ([]PublicUser, error) {
+
+type GroupMember struct {
+	PublicUser
+	Role string `json:"role"`
+}
+
+func (s *Store) GroupMembers(ctx context.Context, id, user string) ([]GroupMember, error) {
 	if _, err := s.Group(ctx, id, user); err != nil {
 		return nil, err
 	}
-	rows, err := s.db.Query(ctx, `SELECT u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'') FROM group_members m JOIN users u ON u.id=m.user_id WHERE m.group_id=$1 ORDER BY m.joined_at,u.id`, id)
+	rows, err := s.db.Query(ctx, `SELECT u.id::text,u.name,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),''),CASE WHEN (SELECT owner_id FROM group_chats WHERE id=m.group_id)=u.id THEN 'owner' ELSE m.role END FROM group_members m JOIN users u ON u.id=m.user_id WHERE m.group_id=$1 ORDER BY m.joined_at,u.id`, id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []PublicUser{}
+	out := []GroupMember{}
 	for rows.Next() {
-		var v PublicUser
-		if err = rows.Scan(&v.ID, &v.Name, &v.AvatarURL); err != nil {
+		var v GroupMember
+		if err = rows.Scan(&v.ID, &v.Name, &v.AvatarURL, &v.Role); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -144,11 +152,15 @@ func (s *Store) GroupMessages(ctx context.Context, id, user string, before int64
 	out := []GroupMessage{}
 	for rows.Next() {
 		var m GroupMessage
-		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind,&m.ReplyToID,&m.ReplyBody,&m.ReplySenderName,&m.EditedAt,&m.ForwardedFromID,&m.AttachmentName,&m.AttachmentMIME,&m.Reactions); err != nil {
+		if err = rows.Scan(&m.ID, &m.GroupID, &m.SenderID, &m.SenderName, &m.ClientMessageID, &m.Body, &m.CreatedAt, &m.Kind, &m.ReplyToID, &m.ReplyBody, &m.ReplySenderName, &m.EditedAt, &m.ForwardedFromID, &m.AttachmentName, &m.AttachmentMIME, &m.Reactions); err != nil {
 			return nil, err
 		}
-		if m.Kind == "image" { m.ImageURL = "/api/groups/" + id + "/messages/" + m.ID + "/image" }
-		if m.Kind == "file" { m.AttachmentURL = "/api/groups/" + id + "/messages/" + m.ID + "/file" }
+		if m.Kind == "image" {
+			m.ImageURL = "/api/groups/" + id + "/messages/" + m.ID + "/image"
+		}
+		if m.Kind == "file" {
+			m.AttachmentURL = "/api/groups/" + id + "/messages/" + m.ID + "/file"
+		}
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -165,6 +177,9 @@ func (s *Store) SendGroupMessage(ctx context.Context, id, user, clientID, body s
 		return GroupMessage{}, false, nil, ErrNotFound
 	}
 	if err != nil {
+		return GroupMessage{}, false, nil, err
+	}
+	if err = checkGroupMember(ctx, tx, id, user); err != nil {
 		return GroupMessage{}, false, nil, err
 	}
 	var blocked bool

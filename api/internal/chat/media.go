@@ -17,7 +17,7 @@ func (s *Store) SendVoice(ctx context.Context, c, u, id, mime string, data []byt
 		return Message{}, false, err
 	}
 	defer tx.Rollback(context.Background())
-	if err = lockSending(ctx, tx, c, u); err != nil {
+	if err = lockSending(ctx, tx, c, u, id); err != nil {
 		return Message{}, false, err
 	}
 	var m Message
