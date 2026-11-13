@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { api, errorText } from './api'
 import type { User } from './api'
+import {parseLoginResponse,requireLoginUser} from './auth-contract'
+import type {LoginResponse} from './auth-contract'
 import { Brand } from './Visual'
 import { BirthDateWheel } from './BirthDateWheel'
 import { parseBirthDate, birthDatesSupported } from './birthdays'
@@ -28,6 +30,8 @@ export default function Auth() {
   const [savedAccounts] = useState(rememberedAccounts)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [challenge,setChallenge]=useState('')
+  const [factor,setFactor]=useState('')
   const [code, setCode] = useState('')
   const [authNotice, setAuthNotice] = useState('')
   const [resendSeconds, setResendSeconds] = useState(0)
@@ -38,9 +42,10 @@ export default function Auth() {
   const [validation,setValidation]=useState<{field:string;message:string}|null>(null)
   useEffect(()=>{if(resendSeconds<=0)return;const timer=window.setTimeout(()=>setResendSeconds(seconds=>seconds-1),1000);return()=>window.clearTimeout(timer)},[resendSeconds])
   const finishLogin = (user:User) => { if (remember) rememberAccount(email); cache.setQueryData(['session'], user); window.history.replaceState(window.history.state, '', '#chats') }
+  const applyLogin=(result:LoginResponse)=>{if(result.kind==='mfa'){setChallenge(result.challenge);setFactor('');setPassword('')}else finishLogin(result.user)}
   const auth = useMutation({
-    mutationFn: async () => (await api.post<{ user: User }>('/auth/login', { email, password })).data.user,
-    onSuccess: finishLogin,
+    mutationFn: async () => parseLoginResponse((await api.post('/auth/login', { email, password })).data),
+    onSuccess: applyLogin,
     onError: error => {
       if ((error as {response?:{data?:{error?:string}}}).response?.data?.error === 'email_not_verified') {
         setAuthNotice('Почта ещё не подтверждена. Получите код и завершите проверку.'); setResendSeconds(0); setMode('verify')
@@ -52,9 +57,10 @@ export default function Auth() {
     onSuccess: response => { setCode(''); setAuthNotice(response.data.delivery_sent ? '' : 'Аккаунт создан, но письмо пока не отправлено. Попробуйте отправить код ещё раз.'); setResendSeconds(60); setMode('verify') },
     onError: error => { if ((error as {response?:{data?:{error?:string}}}).response?.data?.error==='registration_pending') { setMode('verify'); setCode(''); setResendSeconds(0); setAuthNotice('Регистрация уже начата. Введите код из письма или запросите новый.'); } },
   })
+  const factorLogin=useMutation({mutationFn:async()=>requireLoginUser((await api.post('/auth/login/mfa',{challenge,code:factor.trim()})).data),onSuccess:finishLogin})
   const verifyMutation = useMutation({
-    mutationFn: async () => { await api.post('/auth/verify-email',{email,code}); return (await api.post<{user:User}>('/auth/login',{email,password})).data.user },
-    onSuccess: finishLogin,
+    mutationFn: async () => { await api.post('/auth/verify-email',{email,code}); return parseLoginResponse((await api.post('/auth/login',{email,password})).data) },
+    onSuccess: applyLogin,
   })
   const resendMutation = useMutation({
     mutationFn: () => api.post('/auth/resend-verification',{email}),
@@ -77,7 +83,7 @@ export default function Auth() {
     for(const field of fields){
       let message=''
       if(field.name==='name'&&!/^@?[a-z][a-z0-9_]{2,39}$/i.test(field.value.trim()))message='Придумайте @юзер: 3–40 символов, латинские буквы, цифры и _.'
-      else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например you@example.com.'
+      else if(field.name==='email'&&!field.checkValidity())message='Введите корректный адрес почты, например name@gmail.com.'
       else if(field.name==='password'&&mode!=='login'&&!newPasswordIsValid(field.value,passwordMinimum))message=`Пароль: ${passwordMinimum}–32 символов, латинские строчные и заглавные буквы, цифра и один из символов & * $ %.`
       else if(field.name==='code'&&!/^\d{6}$/.test(field.value))message='Введите шестизначный код из письма.'
       if(message){setValidation({field:field.name,message});field.focus();return}
@@ -103,6 +109,7 @@ export default function Auth() {
   const requestError = activeMutation.isError ? errorText(activeMutation.error)
     : mode==='verify'&&resendMutation.isError ? errorText(resendMutation.error)
     : mode==='reset'&&resetRequestMutation.isError ? errorText(resetRequestMutation.error) : ''
+  if(challenge)return <section className="z-auth-card"><Brand/><h1>Подтверди вход</h1><p className="z-muted">Введи код из приложения-аутентификатора или одноразовый резервный код.</p><form className="z-auth-form" onSubmit={event=>{event.preventDefault();if(factor.trim()&&!factorLogin.isPending)factorLogin.mutate()}}><label>Код подтверждения<input autoComplete="one-time-code" autoFocus maxLength={64} value={factor} onChange={event=>setFactor(event.target.value)} required/></label>{factorLogin.isError&&<p className="notice" role="alert">{errorText(factorLogin.error)}</p>}<button className="primary" disabled={factorLogin.isPending||!factor.trim()}>{factorLogin.isPending?'Проверяем…':'Войти'}</button></form><button className="z-auth-switch" type="button" onClick={()=>{setChallenge('');setFactor('');factorLogin.reset();auth.reset()}}>Вернуться ко входу</button></section>
   return <section className="z-auth-card">
     <Brand/>
     {(mode==='login'||mode==='register')&&<div className="z-auth-mode-tabs" role="group" aria-label="Выбор действия">
@@ -114,7 +121,7 @@ export default function Auth() {
     <form noValidate className="z-auth-form" onSubmit={submitAuth}>
       {mode==='register' && <label>Ник / @юзер<input name="name" aria-invalid={validation?.field==='name'} aria-describedby={validation?.field==='name'?'auth-validation':undefined} required maxLength={41} value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" placeholder="Например, byliver" /></label>}
       {mode==='register'&&<div className="z-auth-birth-date"><label>Дата рождения</label><BirthDateWheel value={birthDate} onChange={setBirthDate} invalid={validation?.field==='birth_date'} describedBy={validation?.field==='birth_date'?'auth-validation':undefined}/></div>}
-      {mode!=='verify'&&<label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" readOnly={mode==='reset'} /></label>}
+      {mode!=='verify'&&<label>Почта<input name="email" aria-invalid={validation?.field==='email'} aria-describedby={validation?.field==='email'?'auth-validation':undefined} type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="name@gmail.com" readOnly={mode==='reset'} /></label>}
       {mode==='verify'&&<p className="z-field-help">Код подтверждения для <strong>{email}</strong> действует 10 минут.</p>}
       {mode==='login' && savedAccounts.length > 0 && <div className="z-saved-accounts" aria-label="Запомненные аккаунты">{savedAccounts.map(account => <button type="button" className="secondary" key={account} onClick={() => setEmail(account)}>{account}</button>)}</div>}
       {(mode==='login'||mode==='register'||mode==='reset')&&<label>{mode==='reset'?'Новый пароль':'Пароль'}<span className="z-password-wrap"><input name="password" aria-invalid={validation?.field==='password'} aria-describedby={validation?.field==='password'?'auth-validation':undefined} type={showPassword?'text':'password'} required minLength={mode==='login'?1:passwordMinimum} maxLength={mode==='login'?72:32} value={password} onChange={(e) => setPassword(e.target.value.replace(/\s/g,''))} autoComplete={register||mode==='reset' ? 'new-password' : 'current-password'} placeholder={mode==='login'?'Введите пароль':`${passwordMinimum}–32 символов, A–Z, a–z, 0–9, & * $ %`} /><button className="z-password-visibility" type="button" aria-label={showPassword?'Скрыть пароль':'Показать пароль'} aria-pressed={showPassword} onClick={()=>setShowPassword(visible=>!visible)}>{showPassword?<EyeOff size={18} aria-hidden="true"/>:<Eye size={18} aria-hidden="true"/>}</button></span></label>}
@@ -134,4 +141,3 @@ export default function Auth() {
     {mode==='reset'&&<button className="z-auth-switch" onClick={()=>{setMode('login');setValidation(null);setAuthNotice('')}}>Вернуться ко входу</button>}
   </section>
 }
-

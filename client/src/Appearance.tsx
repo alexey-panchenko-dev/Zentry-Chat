@@ -9,7 +9,7 @@ export const defaultAppearance = {
 
 type Appearance = typeof defaultAppearance
 
-export function AppearanceSettings({ value, update }: { value: Appearance; update: (value: Appearance) => void }) {
+export function AppearanceSettings({ value, update, showSound=false }: { value: Appearance; update: (value: Appearance) => void; showSound?:boolean }) {
   const options = [
     ['text', 'Размер текста', [['normal','Обычный'],['large','Крупный']]],
     ['density','Интервалы в чате',[['normal','Обычные'],['compact','Компактные']]],
@@ -22,13 +22,14 @@ export function AppearanceSettings({ value, update }: { value: Appearance; updat
     {options.map(([key,label,choices]) => <label className="z-setting-row" key={key}>{label}
       <select value={value[key] ?? defaultAppearance[key]} onChange={event => update({ ...value, [key]: event.target.value })}>{choices.map(([id,text]) => <option key={id} value={id}>{text}</option>)}</select>
     </label>)}
-    {([['preview','Текст в уведомлениях'],['sound','Звук новых сообщений'],['enter','Enter отправляет сообщение']] as const).map(([key,label]) =>
+    {showSound&&<label className="z-setting-row">Звуки сообщений<input type="checkbox" checked={value.sound} onChange={event=>update({...value,sound:event.target.checked})}/></label>}
+    {([['preview','Текст в уведомлениях'],['enter','Enter отправляет сообщение']] as const).map(([key,label]) =>
       <label className="z-setting-row" key={key}>{label}<input type="checkbox" checked={value[key]} onChange={event => update({ ...value, [key]: event.target.checked })}/></label>)}
   </section>
 }
 
 type Notice = { chat: Conversation; count: number }
-export function useIncomingNotices(dialogs: Conversation[], options: Record<string,ChatOptions>, visibleChat: string | undefined, sound: boolean, loaded: boolean) {
+export function useIncomingNotices(dialogs: Conversation[], options: Record<string,ChatOptions>, visibleChat: string | undefined, sound: boolean | ((chat:Conversation)=>boolean), loaded: boolean) {
   const [notice, setNotice] = useState<Notice | null>(null)
   const seen = useRef(new Map<string,string>())
   const initialized = useRef(false)
@@ -69,7 +70,7 @@ export function useIncomingNotices(dialogs: Conversation[], options: Record<stri
     setNotice(latest)
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => setNotice(null), 6500)
-    if (sound && document.visibilityState === 'visible') playChime()
+    if ((typeof sound==='function'?sound(latest.chat):sound) && document.visibilityState === 'visible') playChime()
   }, [dialogs, options, visibleChat, sound, loaded])
   return { notice, dismiss: () => setNotice(null) }
 }

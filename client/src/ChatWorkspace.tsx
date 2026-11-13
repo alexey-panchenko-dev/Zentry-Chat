@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, errorText } from './api'
 import { Bookmark } from 'lucide-react'
 import { ActionMenu } from './ActionMenu'
+import { ChatNotificationControls } from './NotificationSettings'
 
 export type Favorite = { id: string; chat_id: string; scope: 'personal' | 'group'; title: string; body: string; kind: string; saved_at: string }
 
@@ -69,9 +70,9 @@ export function useAccountSetting<T>(userID: string, name: string, initial: T) {
 }
 
 export type ChatOptions = { pinned?: boolean; unread?: boolean; muted?: boolean }
-export function ChatRow({ label, selected, options, onOpen, onFirstUnread, onChange, children }: {
+export function ChatRow({ label, selected, options, onOpen, onFirstUnread, onChange, children, scope, chatID }: {
   label: string; selected: boolean; options?: ChatOptions; onOpen: () => void; onFirstUnread?: () => void;
-  onChange: (option: keyof ChatOptions) => void; children: React.ReactNode
+  onChange: (option: keyof ChatOptions) => void; children: React.ReactNode; scope:'personal'|'group'; chatID:string
 }) {
   const row = useRef<HTMLDivElement>(null)
   const gesture = useRef<{ x: number; y: number; id: number; timer: number } | null>(null)
@@ -114,7 +115,7 @@ export function ChatRow({ label, selected, options, onOpen, onFirstUnread, onCha
       {onFirstUnread && <button type="button" onClick={onFirstUnread}>К первому непрочитанному</button>}
       <button type="button" onClick={() => onChange('pinned')}>{options?.pinned ? 'Открепить' : 'Закрепить чат'}</button>
       <button type="button" onClick={() => onChange('unread')}>{options?.unread ? 'Снять пометку' : 'Пометить непрочитанным'}</button>
-      <button type="button" onClick={() => onChange('muted')}>{options?.muted ? 'Включить уведомления' : 'Отключить уведомления'}</button>
+      <ChatNotificationControls scope={scope} chatID={chatID} onSaved={()=>{}} muted={options?.muted} onToggleLocal={()=>onChange('muted')} />
     </ActionMenu>
   </div>
 }

@@ -17,6 +17,7 @@ export function watchConversations(userID: string, refresh: (data: ConversationU
     'discovery.updated': () => refresh({reason:'discovery'}),
     'conversation.read': data => refresh({...data,reason:'read'}),
     'group.updated': data => refresh({...data,reason:'group'}),
+    'group.mention': data => refresh({...data,reason:'group'}),
   }, ready => { status(ready); if (ready) refresh({reason:'connected'}) })
   return () => {
     stop()

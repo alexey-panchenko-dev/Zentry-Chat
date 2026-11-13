@@ -22,4 +22,3 @@ export function isSingleEmoji(text: string): boolean {
   const parts = emojiParts(text.trim())
   return parts.length === 1 && parts[0].key !== null
 }
-

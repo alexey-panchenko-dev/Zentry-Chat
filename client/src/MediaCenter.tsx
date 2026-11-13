@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { api, errorText } from './api'
 import { ImageMessage } from './ImageMessage'
-import { linkRiskReason } from './link-safety'
+import { externalHttpURL,externalLinkHost,linkRiskReason } from './link-safety'
 
 type Medium = {
   id: string
@@ -56,16 +56,15 @@ export function MediaCenter({ scope, chatID, onJump }: { scope: 'personal' | 'gr
       {entry.image_url && <ImageMessage thumbnail url={entry.image_url} gallery={photos}/>}
       {entry.attachment_url && <a href={entry.attachment_url} download={entry.attachment_name}>{entry.attachment_name || 'Скачать файл'}</a>}
       {entry.attachment_size ? <small>{new Intl.NumberFormat('ru-RU', { style: 'unit', unit: 'megabyte', maximumFractionDigits: 1 }).format(entry.attachment_size / 1_048_576)}</small> : null}
-      {tab === 'links' && entry.body.match(/https?:\/\/[^\s<>"']+/gi)?.map((link, i) => <a key={i} href={link} target="_blank" rel="noopener noreferrer" onClick={event => { if (linkRiskReason(link)) { event.preventDefault(); setWarningLink(link) } }}>{link}{linkRiskReason(link) && <span className="z-link-warning-mark" aria-label="Проверить ссылку"> ⚠</span>}</a>)}
+      {tab === 'links' && entry.body.match(/https?:\/\/[^\s<>"']+/gi)?.map((link, i) => {const safe=externalHttpURL(link);if(!safe)return <span key={i}>{link}</span>;return linkRiskReason(safe)?<button type="button" className="z-risky-link" key={i} onClick={()=>setWarningLink(safe)}>{link} <span className="z-link-warning-mark" aria-label="Проверить ссылку">⚠</span></button>:<a key={i} href={safe} target="_blank" rel="noopener noreferrer">{link}</a>})}
       <button type="button" className="z-media-jump" onClick={() => onJump(entry.id)}>К сообщению</button>
     </div>)}
     {data.hasNextPage && <button type="button" className="secondary" disabled={data.isFetchingNextPage} onClick={() => void data.fetchNextPage()}>{data.isFetchingNextPage ? 'Загружаем…' : 'Показать ещё'}</button>}
     <dialog ref={warningDialog} className="z-link-warning" aria-labelledby="z-link-warning-title" onCancel={event => { event.preventDefault(); setWarningLink(null) }} onClick={event => { if (event.target === event.currentTarget) setWarningLink(null) }}>
       <h2 id="z-link-warning-title">Проверь ссылку</h2>
       <p>Эта ссылка выглядит потенциально рискованной: {warningLink ? linkRiskReason(warningLink) : ''}. Zently не проверяет содержимое страницы.</p>
-      {warningLink && <strong className="z-link-warning-url">{warningLink}</strong>}
-      <div><button type="button" className="secondary" onClick={() => setWarningLink(null)}>Отмена</button><button type="button" className="primary" onClick={() => { if (warningLink) window.open(warningLink, '_blank', 'noopener,noreferrer'); setWarningLink(null) }}>Открыть ссылку</button></div>
+      {warningLink && <><strong className="z-link-warning-url">Домен: {externalLinkHost(warningLink)}</strong><small className="z-link-warning-url">{warningLink}</small></>}
+      <div><button type="button" className="secondary" onClick={() => setWarningLink(null)}>Отмена</button><button type="button" className="primary" onClick={() => { const safe=warningLink&&externalHttpURL(warningLink);if(safe)window.open(safe, '_blank', 'noopener,noreferrer'); setWarningLink(null) }}>Открыть ссылку</button></div>
     </dialog>
   </section>
 }
-

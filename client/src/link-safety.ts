@@ -2,6 +2,13 @@ const shortenerHosts = new Set([
   'bit.ly', 't.co', 'tinyurl.com', 'tiny.cc', 'cutt.ly', 'is.gd', 'rb.gy', 'shorturl.at',
 ])
 
+export function externalHttpURL(value:string):string|null{
+  try{const url=new URL(value);return url.protocol==='https:'||url.protocol==='http:'?url.href:null}catch{return null}
+}
+export function externalLinkHost(value:string):string{
+  try{return new URL(value).host}catch{return 'Неизвестный адрес'}
+}
+
 function isIPAddress(host: string): boolean {
   const value = host.replace(/^\[|\]$/g, '')
   if (value.includes(':')) return true
@@ -19,4 +26,3 @@ export function linkRiskReason(value: string): string | null {
   if (shortenerHosts.has(host)) return 'сокращатель скрывает конечный адрес страницы'
   return null
 }
-
