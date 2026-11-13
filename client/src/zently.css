@@ -386,7 +386,7 @@ body:has(> .z-contact-dialog[open]) #root{filter:blur(8px)}
 .z-shell>.z-sidebar{animation:z-surface-in 300ms var(--z-motion-ease) both}
 .z-shell>.z-dialogs{animation:z-surface-in 340ms var(--z-motion-ease) 45ms both}
 .z-shell>.z-workspace{animation:z-surface-in 380ms var(--z-motion-ease) 90ms both}
-.z-shell[data-ui-section="profile"] .z-settings,.z-shell[data-ui-section="settings"] .z-settings,.z-shell[data-ui-section="discovery"] .z-discovery,.z-shell[data-ui-section="calls"] .z-call-lobby,.z-shell[data-ui-section="chats"] .z-message-view:not([hidden]){animation:z-surface-in var(--z-motion-enter) var(--z-motion-ease) both}
+.z-shell[data-ui-section="profile"] .z-settings,.z-shell[data-ui-section="settings"] .z-settings,.z-shell[data-ui-section="discovery"] .z-discovery,.z-shell[data-ui-section="calls"] .z-call-lobby{animation:z-surface-in var(--z-motion-enter) var(--z-motion-ease) both}
 .z-auth-card{animation:z-surface-in 420ms var(--z-motion-ease) both}
 
 button,.z-search,.z-composer-field,.z-chat-header,.z-contact,.z-group-pick,.z-profile-image-button,.z-group-profile-avatar,.z-photo-picker,.z-discovery-card,.z-message-image-button,.z-voice-player,.z-contact-photo-tile{transition:background-color var(--z-motion-fast) ease,border-color var(--z-motion-fast) ease,box-shadow var(--z-motion-ui) ease,color var(--z-motion-fast) ease,filter var(--z-motion-fast) ease,transform var(--z-motion-fast) var(--z-motion-ease),opacity var(--z-motion-fast) ease}
