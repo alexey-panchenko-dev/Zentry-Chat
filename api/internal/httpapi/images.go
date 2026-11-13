@@ -73,7 +73,7 @@ func (h *chatHandlers) sendImage(w http.ResponseWriter, r *http.Request, u auth.
 	delivery := "disabled"
 	if h.publisher.Enabled() {
 		delivery = "published"
-		if h.publisher.Publish("private-conversation-"+id, "message.created", map[string]any{"message": message}) != nil {
+		if h.publisher.Publish("private-conversation-"+id, "message.created", map[string]string{"conversation_id": id}) != nil {
 			delivery = "failed"
 		}
 	}

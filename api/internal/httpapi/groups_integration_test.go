@@ -56,6 +56,8 @@ func TestGroupsRequireExistingContactsAndShareMessages(t *testing.T) {
 		}
 	})
 	path := "/api/groups/" + group.ID
+	f.request(t, 1, "POST", path+"/typing", `{}`, 204)
+	f.request(t, 3, "POST", path+"/typing", `{}`, 404)
 	f.request(t, -1, "GET", path+"/messages", "", 401)
 	f.request(t, 3, "GET", path+"/messages", "", 404)
 	f.request(t, 3, "GET", path+"/members", "", 404)
@@ -78,6 +80,21 @@ func TestGroupsRequireExistingContactsAndShareMessages(t *testing.T) {
 		}
 	}
 	f.request(t, 0, "POST", path+"/messages", `{"client_message_id":"e4444444-4444-4444-8444-444444444445","body":"Ответ"}`, 201)
+	var username string
+	if err := f.db.QueryRow(f.ctx, `SELECT username FROM users WHERE id=$1`, f.users[1].ID).Scan(&username); err != nil {
+		t.Fatal(err)
+	}
+	mentionBody := "e4444444-4444-4444-8444-444444444449"
+	mentioned := f.request(t, 0, "POST", path+"/messages", fmt.Sprintf(`{"client_message_id":%q,"body":%q,"mentions":[%q]}`, mentionBody, "Привет @"+username, f.users[1].ID), 201)
+	if !strings.Contains(string(mentioned["message"]), `"user_id":"`+f.users[1].ID+`"`) {
+		t.Fatalf("structured mention missing: %s", mentioned["message"])
+	}
+	mentionRetry := f.request(t, 0, "POST", path+"/messages", fmt.Sprintf(`{"client_message_id":%q,"body":%q,"mentions":[%q]}`, mentionBody, "Привет @"+username, f.users[1].ID), 200)
+	if !strings.Contains(string(mentionRetry["message"]), `"username":"`+username+`"`) {
+		t.Fatalf("mention retry missing: %s", mentionRetry["message"])
+	}
+	f.request(t, 0, "POST", path+"/messages", fmt.Sprintf(`{"client_message_id":"e4444444-4444-4444-8444-444444444450","body":"@someone","mentions":[%q]}`, f.users[1].ID), 400)
+	f.request(t, 0, "POST", path+"/messages", fmt.Sprintf(`{"client_message_id":"e4444444-4444-4444-8444-444444444451","body":"@someone","mentions":[%q]}`, f.users[3].ID), 400)
 	found := f.request(t, 0, "GET", "/api/groups", "", 200)
 	if !strings.Contains(string(found["groups"]), group.ID) {
 		t.Fatal("group absent from list")
