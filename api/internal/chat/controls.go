@@ -52,7 +52,7 @@ func lockConversation(ctx context.Context, tx pgx.Tx, id, user string) error {
 	}
 	return err
 }
-func lockSending(ctx context.Context, tx pgx.Tx, id, user string) error {
+func lockSending(ctx context.Context, tx pgx.Tx, id, user, clientID string) error {
 	peer, err := conversationPeer(ctx, tx, id, user)
 	if err != nil {
 		return err
@@ -61,6 +61,9 @@ func lockSending(ctx context.Context, tx pgx.Tx, id, user string) error {
 		return err
 	}
 	if err = contactguard.CheckBlocked(ctx, tx, user, peer); err != nil {
+		return err
+	}
+	if err = contactguard.CheckFirstMessage(ctx, tx, user, peer, id, clientID); err != nil {
 		return err
 	}
 	return lockConversation(ctx, tx, id, user)

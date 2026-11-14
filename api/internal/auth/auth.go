@@ -179,7 +179,7 @@ func (s *Service) register(ctx context.Context, name, email, password string, bi
 	return u, tx.Commit(ctx)
 }
 
-func (s *Service) Login(ctx context.Context, email, password string) (User, string, time.Time, error) {
+func (s *Service) Login(ctx context.Context, email, password string, agents ...string) (User, string, time.Time, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return User{}, "", time.Time{}, err
@@ -206,7 +206,7 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 	var u User
 	var hash string
 	var verified bool
-	err = tx.QueryRow(ctx, `SELECT id::text,name,username,email,created_at,password_hash,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),''),email_verified FROM users WHERE email=$1`, email).
+	err = tx.QueryRow(ctx, `SELECT id::text,name,username,email,created_at,password_hash,COALESCE((SELECT '/api/profiles/'||users.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=users.id),''),email_verified FROM users WHERE email=$1 FOR UPDATE`, email).
 		Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt, &hash, &u.AvatarURL, &verified)
 	if errors.Is(err, pgx.ErrNoRows) {
 		_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(password))
@@ -251,7 +251,26 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, stri
 	token := hex.EncodeToString(bytes[:])
 	digest := sha256.Sum256([]byte(token))
 	expires := time.Now().UTC().Add(SessionTTL)
-	if _, err = tx.Exec(ctx, `INSERT INTO sessions (user_id,token_hash,expires_at) VALUES ($1,$2,$3)`, u.ID, digest[:], expires); err != nil {
+	agent := ""
+	if len(agents) > 0 {
+		parts := []rune(strings.ToValidUTF8(agents[0], ""))
+		if len(parts) > 512 {
+			parts = parts[:512]
+		}
+		agent = string(parts)
+	}
+	if challenge, until, required, e := s.createMFAChallenge(ctx, tx, u.ID, agent); e != nil {
+		return User{}, "", time.Time{}, e
+	} else if required {
+		if e = tx.Commit(ctx); e != nil {
+			return User{}, "", time.Time{}, e
+		}
+		return User{}, challenge, until, ErrMFARequired
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO sessions (user_id,token_hash,expires_at,user_agent) VALUES ($1,$2,$3,$4)`, u.ID, digest[:], expires, agent); err != nil {
+		return User{}, "", time.Time{}, err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO security_events(user_id,kind) VALUES($1,'login')`, u.ID); err != nil {
 		return User{}, "", time.Time{}, err
 	}
 	return u, token, expires, tx.Commit(ctx)
@@ -275,7 +294,7 @@ func (s *Service) CurrentUser(ctx context.Context, token string) (User, error) {
 	}
 	digest := sha256.Sum256([]byte(token))
 	var u User
-	err := s.db.QueryRow(ctx, `SELECT u.id::text,u.name,u.username,u.email,u.created_at,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'')
+	err := s.db.QueryRow(ctx, `WITH activity AS (UPDATE sessions SET last_seen_at=now() WHERE token_hash=$1 AND expires_at>now() AND last_seen_at<now()-interval '1 minute') SELECT u.id::text,u.name,u.username,u.email,u.created_at,COALESCE((SELECT '/api/profiles/'||u.id::text||'/photo?v='||p.revision::text FROM profile_photos p WHERE p.user_id=u.id),'')
 		FROM sessions s JOIN users u ON u.id=s.user_id
 		WHERE s.token_hash=$1 AND s.expires_at>now()`, digest[:]).Scan(&u.ID, &u.Name, &u.Username, &u.Email, &u.CreatedAt, &u.AvatarURL)
 	if errors.Is(err, pgx.ErrNoRows) {

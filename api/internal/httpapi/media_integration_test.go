@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/png"
 	"io"
+	"math/rand"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -154,7 +155,14 @@ func TestMediaPersistenceAccessAndRetries(t *testing.T) {
 	fields["duration_ms"] = "1000"
 	request(0, "POST", path, "audio", "audio/webm", make([]byte, maxVoice+1), fields, 400, "")
 	var photo bytes.Buffer
-	png.Encode(&photo, image.NewRGBA(image.Rect(0, 0, 3, 3)))
+	photoImage := image.NewNRGBA(image.Rect(0, 0, 512, 512))
+	photoRandom := rand.New(rand.NewSource(42))
+	for i := range photoImage.Pix {
+		photoImage.Pix[i] = byte(photoRandom.Intn(256))
+	}
+	if err := png.Encode(&photo, photoImage); err != nil {
+		t.Fatal(err)
+	}
 	photoURL := "/api/profiles/" + users[0].ID + "/photo"
 	uploaded, _ := request(0, "POST", "/api/profile/photo", "photo", "image/png", photo.Bytes(), nil, 200, "")
 	var avatar struct {
@@ -164,7 +172,30 @@ func TestMediaPersistenceAccessAndRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 	photoURL = avatar.URL
-	request(1, "GET", photoURL, "", "", nil, nil, 200, "")
+	started := time.Now()
+	original, originalHeaders := request(1, "GET", photoURL, "", "", nil, nil, 200, "")
+	originalTime := time.Since(started)
+	started = time.Now()
+	thumbnail, thumbnailHeaders := request(1, "GET", photoURL+"&size=128", "", "", nil, nil, 200, "")
+	thumbnailTime := time.Since(started)
+	if len(thumbnail) >= len(original)/2 {
+		t.Fatalf("thumbnail too large: original=%d thumbnail=%d", len(original), len(thumbnail))
+	}
+	if thumbnailHeaders.Get("Cache-Control") != "private, max-age=31536000, immutable" || thumbnailHeaders.Get("ETag") != originalHeaders.Get("ETag") {
+		t.Fatalf("avatar cache headers original=%v thumbnail=%v", originalHeaders, thumbnailHeaders)
+	}
+	conditional, _ := http.NewRequest("GET", server.URL+photoURL+"&size=128", nil)
+	conditional.AddCookie(&http.Cookie{Name: sessionCookie, Value: tokens[1]})
+	conditional.Header.Set("If-None-Match", thumbnailHeaders.Get("ETag"))
+	conditionalResponse, err := server.Client().Do(conditional)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conditionalResponse.Body.Close()
+	if conditionalResponse.StatusCode != http.StatusNotModified {
+		t.Fatalf("conditional avatar request status=%d", conditionalResponse.StatusCode)
+	}
+	t.Logf("avatar network baseline: %d bytes, %s; cached thumbnail: %d bytes, %s (%.1f%% smaller); validator: 304", len(original), originalTime, len(thumbnail), thumbnailTime, 100*(1-float64(len(thumbnail))/float64(len(original))))
 	request(-1, "GET", photoURL, "", "", nil, nil, 401, "")
 	current, e := service.CurrentUser(ctx, tokens[0])
 	if e != nil || current.AvatarURL != photoURL {

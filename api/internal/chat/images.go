@@ -17,7 +17,7 @@ func (s *Store) SendImage(ctx context.Context, c, u, id, caption string, data []
 		return Message{}, false, err
 	}
 	defer tx.Rollback(context.Background())
-	if err = lockSending(ctx, tx, c, u); err != nil {
+	if err = lockSending(ctx, tx, c, u, id); err != nil {
 		return Message{}, false, err
 	}
 	var m Message

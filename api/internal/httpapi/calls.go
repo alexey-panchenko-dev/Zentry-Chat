@@ -10,6 +10,7 @@ import (
 
 	"newsChat/api/internal/auth"
 	"newsChat/api/internal/calls"
+	"newsChat/api/internal/contactguard"
 	"newsChat/api/internal/realtime"
 )
 
@@ -173,7 +174,7 @@ func (h *callHandlers) notify(call calls.Call) string {
 	}
 	result := "published"
 	for _, id := range []string{call.CallerID, call.CalleeID} {
-		if err := h.publisher.Publish("private-user-"+id, "call.updated", map[string]any{"call": call}); err != nil {
+		if err := h.publisher.Publish("private-user-"+id, "call.updated", map[string]string{"call_id": call.ID}); err != nil {
 			result = "failed"
 			log.Println("Pusher: состояние звонка сохранено, уведомление не отправлено")
 		}
@@ -231,6 +232,8 @@ func callID(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 func callFailure(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, contactguard.ErrPrivacy):
+		writeJSON(w, 403, map[string]string{"error": "privacy_restricted"})
 	case errors.Is(err, calls.ErrBlocked):
 		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
 	case errors.Is(err, calls.ErrNotFound):

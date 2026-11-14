@@ -63,10 +63,15 @@ func (h *chatHandlers) listGroups(w http.ResponseWriter, r *http.Request, u auth
 }
 func (h *chatHandlers) getGroup(w http.ResponseWriter, r *http.Request, u auth.User) {
 	id, ok := groupID(w, r)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	g, err := h.store.Group(r.Context(), id, u.ID)
-	if err != nil { chatFailure(w, err); return }
-	writeJSON(w, 200, map[string]any{"group":g})
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"group": g})
 }
 func (h *chatHandlers) groupMembers(w http.ResponseWriter, r *http.Request, u auth.User) {
 	id, ok := groupID(w, r)
@@ -107,9 +112,10 @@ func (h *chatHandlers) sendGroupMessage(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	var in struct {
-		ClientMessageID string `json:"client_message_id"`
-		Body            string `json:"body"`
-		ReplyToID       string `json:"reply_to_id"`
+		ClientMessageID string   `json:"client_message_id"`
+		Body            string   `json:"body"`
+		ReplyToID       string   `json:"reply_to_id"`
+		Mentions        []string `json:"mentions"`
 	}
 	if !readAuthJSON(w, r, &in) {
 		return
@@ -124,18 +130,32 @@ func (h *chatHandlers) sendGroupMessage(w http.ResponseWriter, r *http.Request, 
 	var created bool
 	var members []string
 	var e error
-	if in.ReplyToID!="" {
-		replyID,parseErr:=strconv.ParseInt(in.ReplyToID,10,64)
-		if parseErr!=nil||replyID<1{writeJSON(w,400,map[string]string{"error":"invalid_reply"});return}
-		m,created,members,e=h.store.SendGroupReply(r.Context(),id,u.ID,in.ClientMessageID,in.Body,strconv.FormatInt(replyID,10))
+	if in.ReplyToID != "" {
+		replyID, parseErr := strconv.ParseInt(in.ReplyToID, 10, 64)
+		if parseErr != nil || replyID < 1 {
+			writeJSON(w, 400, map[string]string{"error": "invalid_reply"})
+			return
+		}
+		m, created, members, e = h.store.SendGroupReplyWithMentions(r.Context(), id, u.ID, in.ClientMessageID, in.Body, strconv.FormatInt(replyID, 10), in.Mentions)
 	} else {
-		m, created, members, e = h.store.SendGroupMessage(r.Context(), id, u.ID, in.ClientMessageID, in.Body)
+		m, created, members, e = h.store.SendGroupMessageWithMentions(r.Context(), id, u.ID, in.ClientMessageID, in.Body, in.Mentions)
 	}
 	if e != nil {
+		if errors.Is(e, chat.ErrInvalidMentions) {
+			writeJSON(w, 400, map[string]string{"error": "invalid_mentions"})
+			return
+		}
 		chatFailure(w, e)
 		return
 	}
 	h.publishGroupUpdate(id, members...)
+	if created {
+		for _, mention := range m.Mentions {
+			if h.publisher.Enabled() {
+				_ = h.publisher.Publish("private-user-"+mention.UserID, "group.mention", map[string]string{"group_id": id, "message_id": m.ID})
+			}
+		}
+	}
 	status := 200
 	if created {
 		status = 201
@@ -174,37 +194,74 @@ func (h *chatHandlers) setGroupPhoto(w http.ResponseWriter, r *http.Request, u a
 
 func (h *chatHandlers) sendGroupImage(w http.ResponseWriter, r *http.Request, u auth.User) {
 	id, ok := groupID(w, r)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	b, _, ok := mediaUpload(w, r, "photo", maxMessageImage)
-	if !ok { return }
+	if !ok {
+		return
+	}
 	clientID := strings.ToLower(r.FormValue("client_message_id"))
 	caption, captionErr := normalizeImageCaption(r.FormValue("caption"))
-	if !uuidPattern.MatchString(clientID) || captionErr != nil { writeJSON(w, 400, map[string]string{"error":"invalid_image"}); return }
+	if !uuidPattern.MatchString(clientID) || captionErr != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_image"})
+		return
+	}
 	b, err := normalizeMessageImage(b)
-	if err != nil { writeJSON(w, 400, map[string]string{"error":"invalid_image"}); return }
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_image"})
+		return
+	}
 	message, created, members, err := h.store.SendGroupImage(r.Context(), id, u.ID, clientID, caption, b)
-	if err != nil { chatFailure(w, err); return }
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
 	h.publishGroupUpdate(id, members...)
-	status := 200; if created { status = 201 }
-	writeJSON(w, status, map[string]any{"message":message,"realtime":"published"})
+	status := 200
+	if created {
+		status = 201
+	}
+	writeJSON(w, status, map[string]any{"message": message, "realtime": "published"})
 }
 
 func (h *chatHandlers) listGroupImages(w http.ResponseWriter, r *http.Request, u auth.User) {
-	id, ok := groupID(w, r); if !ok { return }
-	before, limit, ok := pagination(w, r); if !ok { return }
+	id, ok := groupID(w, r)
+	if !ok {
+		return
+	}
+	before, limit, ok := pagination(w, r)
+	if !ok {
+		return
+	}
 	images, err := h.store.GroupImages(r.Context(), id, u.ID, before, limit+1)
-	if err != nil { chatFailure(w, err); return }
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
 	cursor := ""
-	if len(images) > limit { images = images[:limit]; cursor = images[len(images)-1].ID }
-	writeJSON(w, 200, map[string]any{"images":images,"next_cursor":cursor})
+	if len(images) > limit {
+		images = images[:limit]
+		cursor = images[len(images)-1].ID
+	}
+	writeJSON(w, 200, map[string]any{"images": images, "next_cursor": cursor})
 }
 
 func (h *chatHandlers) groupMessageImage(w http.ResponseWriter, r *http.Request, u auth.User) {
-	id, ok := groupID(w, r); if !ok { return }
+	id, ok := groupID(w, r)
+	if !ok {
+		return
+	}
 	messageID, err := strconv.ParseInt(r.PathValue("messageID"), 10, 64)
-	if err != nil || messageID < 1 { writeJSON(w, 404, map[string]string{"error":"not_found"}); return }
+	if err != nil || messageID < 1 {
+		writeJSON(w, 404, map[string]string{"error": "not_found"})
+		return
+	}
 	b, mime, err := h.store.GroupMessageImage(r.Context(), id, strconv.FormatInt(messageID, 10), u.ID)
-	if err != nil { chatFailure(w, err); return }
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
 	serveMessagePhoto(w, r, b, mime)
 }
 

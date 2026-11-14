@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
 	"image/draw"
 	_ "image/jpeg"
 	"image/png"
@@ -62,6 +63,42 @@ func normalizePhoto(b []byte) ([]byte, string, error) {
 	}
 	return out.Bytes(), "image/png", nil
 }
+
+// avatarRendition is generated only when a profile photo changes. Its box
+// filter averages source pixels, preserving transparency while avoiding work
+// on every later image request.
+func avatarRendition(b []byte, maxDimension int) ([]byte, error) {
+	source, _, err := image.Decode(bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	bounds := source.Bounds()
+	w, h := min(maxDimension, bounds.Dx()), min(maxDimension, bounds.Dy())
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		y0, y1 := bounds.Min.Y+y*bounds.Dy()/h, bounds.Min.Y+(y+1)*bounds.Dy()/h
+		for x := 0; x < w; x++ {
+			x0, x1 := bounds.Min.X+x*bounds.Dx()/w, bounds.Min.X+(x+1)*bounds.Dx()/w
+			var r, g, bl, a uint64
+			count := uint64((x1 - x0) * (y1 - y0))
+			for sy := y0; sy < y1; sy++ {
+				for sx := x0; sx < x1; sx++ {
+					c := color.RGBAModel.Convert(source.At(sx, sy)).(color.RGBA)
+					r += uint64(c.R)
+					g += uint64(c.G)
+					bl += uint64(c.B)
+					a += uint64(c.A)
+				}
+			}
+			dst.SetRGBA(x, y, color.RGBA{R: uint8(r / count), G: uint8(g / count), B: uint8(bl / count), A: uint8(a / count)})
+		}
+	}
+	var out bytes.Buffer
+	if err = png.Encode(&out, dst); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
 func mediaUpload(w http.ResponseWriter, r *http.Request, field string, limit int) ([]byte, string, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, int64(limit+64*1024))
 	if err := r.ParseMultipartForm(int64(limit + 64*1024)); err != nil {
@@ -111,7 +148,7 @@ func (h *chatHandlers) sendVoice(w http.ResponseWriter, r *http.Request, u auth.
 	delivery := "disabled"
 	if h.publisher.Enabled() {
 		delivery = "published"
-		if h.publisher.Publish("private-conversation-"+id, "message.created", map[string]any{"message": message}) != nil {
+		if h.publisher.Publish("private-conversation-"+id, "message.created", map[string]string{"conversation_id": id}) != nil {
 			delivery = "failed"
 		}
 	}
@@ -154,7 +191,17 @@ func (h *chatHandlers) setPhoto(w http.ResponseWriter, r *http.Request, u auth.U
 		writeJSON(w, 400, map[string]string{"error": "invalid_photo"})
 		return
 	}
-	avatarURL, err := h.store.SetPhoto(r.Context(), u.ID, b, m)
+	profile, err := avatarRendition(b, 512)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_photo"})
+		return
+	}
+	thumbnail, err := avatarRendition(b, 128)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid_photo"})
+		return
+	}
+	avatarURL, err := h.store.SetPhoto(r.Context(), u.ID, b, m, profile, thumbnail)
 	if err != nil {
 		chatFailure(w, err)
 		return
@@ -174,10 +221,35 @@ func (h *chatHandlers) photo(w http.ResponseWriter, r *http.Request, u auth.User
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
 		return
 	}
-	b, m, err := h.store.Photo(r.Context(), id)
+	size := r.URL.Query().Get("size")
+	if size != "" && size != "128" && size != "512" {
+		writeJSON(w, 400, map[string]string{"error": "invalid_photo_size"})
+		return
+	}
+	b, m, revision, err := h.store.Photo(r.Context(), id, size)
 	if err != nil {
 		chatFailure(w, err)
 		return
 	}
-	serveMedia(w, r, b, m)
+	serveAvatar(w, r, b, m, revision)
+}
+
+func serveAvatar(w http.ResponseWriter, r *http.Request, b []byte, mime, revision string) {
+	etag := `"` + revision + `"`
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("ETag", etag)
+	if r.URL.Query().Get("v") == revision {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
+	for _, candidate := range strings.Split(r.Header.Get("If-None-Match"), ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || candidate == etag || candidate == "W/"+etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+	http.ServeContent(w, r, "avatar", time.Time{}, bytes.NewReader(b))
 }

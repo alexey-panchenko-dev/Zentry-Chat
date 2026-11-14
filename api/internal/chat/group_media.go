@@ -8,16 +8,24 @@ import (
 )
 
 func (s *Store) SetGroupPhoto(ctx context.Context, groupID, userID string, data []byte, mime string) (string, error) {
-	group, err := s.Group(ctx, groupID, userID)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return "", err
 	}
-	if group.OwnerID != userID {
+	defer tx.Rollback(context.Background())
+	role, err := lockManagedGroup(ctx, tx, groupID, userID)
+	if err != nil {
+		return "", err
+	}
+	if role != "owner" && role != "admin" {
 		return "", ErrForbidden
 	}
 	var revision string
-	err = s.db.QueryRow(ctx, `UPDATE group_chats SET avatar=$3,avatar_mime=$4,avatar_revision=gen_random_uuid(),updated_at=now() WHERE id=$1 AND owner_id=$2 RETURNING avatar_revision::text`, groupID, userID, data, mime).Scan(&revision)
-	return "/api/groups/" + groupID + "/photo?v=" + revision, err
+	err = tx.QueryRow(ctx, `UPDATE group_chats SET avatar=$2,avatar_mime=$3,avatar_revision=gen_random_uuid(),updated_at=now() WHERE id=$1 RETURNING avatar_revision::text`, groupID, data, mime).Scan(&revision)
+	if err != nil {
+		return "", err
+	}
+	return "/api/groups/" + groupID + "/photo?v=" + revision, tx.Commit(ctx)
 }
 
 func (s *Store) GroupPhoto(ctx context.Context, groupID, userID string) ([]byte, string, error) {

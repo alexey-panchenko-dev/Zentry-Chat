@@ -1,0 +1,2 @@
+ALTER TABLE group_message_mentions DROP CONSTRAINT group_message_mentions_token_check;
+ALTER TABLE group_message_mentions ADD CONSTRAINT group_message_mentions_token_check CHECK(char_length(token) BETWEEN 2 AND 41);

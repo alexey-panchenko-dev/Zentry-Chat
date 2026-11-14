@@ -20,8 +20,9 @@ import (
 const sessionCookie = "chat_session"
 
 type authHandlers struct {
-	service *auth.Service
-	mailer  codeMailer
+	service        *auth.Service
+	mailer         codeMailer
+	securityNotify func(string)
 }
 
 var emailCodePattern = regexp.MustCompile(`^[0-9]{6}$`)
@@ -48,7 +49,7 @@ func (h *authHandlers) register(w http.ResponseWriter, r *http.Request) {
 		!validPassword(input.Password) {
 		writeJSON(w, 400, map[string]string{
 			"error":   "invalid_input",
-			"message": "Нужны @юзер, почта и пароль длиной 6–16 символов: латинские строчные и заглавные буквы, цифра и один из символов & * $ %",
+			"message": "Нужны @юзер, почта и пароль длиной 6–32 символов: латинские строчные и заглавные буквы, цифра и один из символов & * $ %",
 		})
 		return
 	}
@@ -245,7 +246,15 @@ func (h *authHandlers) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 401, map[string]string{"error": "invalid_credentials"})
 		return
 	}
-	u, token, expires, err := h.service.Login(r.Context(), email, input.Password)
+	u, token, expires, err := h.service.Login(r.Context(), email, input.Password, r.UserAgent())
+	if errors.Is(err, auth.ErrMFARequired) {
+		writeJSON(w, 202, map[string]any{"mfa_required": true, "challenge": token, "expires_at": expires})
+		return
+	}
+	if errors.Is(err, auth.ErrMFAUnavailable) {
+		writeJSON(w, 503, map[string]string{"error": "mfa_unavailable"})
+		return
+	}
 	if errors.Is(err, auth.ErrLoginLocked) {
 		w.Header().Set("Retry-After", "600")
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "login_temporarily_locked"})
@@ -264,6 +273,9 @@ func (h *authHandlers) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, Secure: os.Getenv("COOKIE_SECURE") == "true", SameSite: http.SameSiteLaxMode, Expires: expires, MaxAge: int(auth.SessionTTL.Seconds())})
+	if h.securityNotify != nil {
+		h.securityNotify(u.ID)
+	}
 	writeJSON(w, 200, map[string]any{"user": u})
 }
 
@@ -341,7 +353,7 @@ func normalizedEmail(value string) (string, bool) {
 }
 
 func validPassword(value string) bool {
-	if !utf8.ValidString(value) || len(value) < 6 || len(value) > 16 {
+	if !utf8.ValidString(value) || len(value) < 6 || len(value) > 32 {
 		return false
 	}
 	var lower, upper, digit, special bool

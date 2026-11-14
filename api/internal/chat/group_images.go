@@ -23,6 +23,9 @@ func (s *Store) SendGroupImage(ctx context.Context, id, user, clientID, caption 
 	if err != nil {
 		return GroupMessage{}, false, nil, err
 	}
+	if err = checkGroupMember(ctx, tx, id, user); err != nil {
+		return GroupMessage{}, false, nil, err
+	}
 	var blocked bool
 	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM contact_blocks b JOIN group_members gm ON gm.group_id=$1 AND gm.user_id=CASE WHEN b.blocker_id=$2 THEN b.blocked_id ELSE b.blocker_id END WHERE b.blocker_id=$2 OR b.blocked_id=$2)`, id, user).Scan(&blocked)
 	if err != nil {

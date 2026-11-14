@@ -13,12 +13,14 @@ import (
 	"newsChat/api/internal/auth"
 	"newsChat/api/internal/chat"
 	"newsChat/api/internal/realtime"
+	"newsChat/api/internal/webnotify"
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 var socketPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
 
 type chatHandlers struct {
+	push      *webnotify.Service
 	budget    accountBudget
 	store     *chat.Store
 	auth      *auth.Service
@@ -103,6 +105,28 @@ func (h *chatHandlers) publishConversationUpdate(event, id string, users ...stri
 			log.Println("Pusher: не удалось обновить список переписок; данные сохранены в PostgreSQL")
 		}
 	}
+}
+
+func (h *chatHandlers) typingConversation(w http.ResponseWriter, r *http.Request, u auth.User) {
+	id, ok := conversationID(w, r)
+	if !ok {
+		return
+	}
+	participants, err := h.store.ConversationParticipants(r.Context(), id, u.ID)
+	if err != nil {
+		chatFailure(w, err)
+		return
+	}
+	if !allowTypingEvent(u.ID, "personal", id) {
+		writeJSON(w, 429, map[string]string{"error": "typing_rate_limited"})
+		return
+	}
+	for _, participant := range participants {
+		if participant != u.ID {
+			_ = h.publisher.Publish("private-user-"+participant, "chat.typing", map[string]string{"conversation_id": id, "user_id": u.ID})
+		}
+	}
+	writeJSON(w, 204, nil)
 }
 
 func (h *chatHandlers) listConversations(w http.ResponseWriter, r *http.Request, user auth.User) {
@@ -204,7 +228,7 @@ func (h *chatHandlers) sendMessage(w http.ResponseWriter, r *http.Request, user 
 		// The message is committed before contacting Pusher. Replays re-publish the
 		// same ID, so clients must deduplicate HTTP responses and realtime events.
 		delivery = "published"
-		if err := h.publisher.Publish("private-conversation-"+id, "message.created", map[string]any{"message": message}); err != nil {
+		if err := h.publisher.Publish("private-conversation-"+id, "message.created", map[string]string{"conversation_id": id}); err != nil {
 			log.Println("Pusher: не удалось отправить событие; сообщение сохранено в PostgreSQL")
 			delivery = "failed"
 		}
@@ -293,6 +317,18 @@ func pagination(w http.ResponseWriter, r *http.Request) (int64, int, bool) {
 }
 
 func chatFailure(w http.ResponseWriter, err error) {
+	if errors.Is(err, chat.ErrDiscoveryMinorDisabled) {
+		writeJSON(w, 403, map[string]string{"error": "discovery_adults_only"})
+		return
+	}
+	if errors.Is(err, chat.ErrAgeGroupLocked) {
+		writeJSON(w, 403, map[string]string{"error": "age_group_locked"})
+		return
+	}
+	if errors.Is(err, chat.ErrPrivacy) {
+		writeJSON(w, 403, map[string]string{"error": "privacy_restricted"})
+		return
+	}
 	if errors.Is(err, chat.ErrBlocked) {
 		writeJSON(w, 403, map[string]string{"error": "contact_blocked"})
 		return

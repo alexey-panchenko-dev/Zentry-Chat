@@ -36,6 +36,40 @@ func TestOptimizedDetailedAvatarFitsStoredPNG(t *testing.T) {
 	}
 }
 
+func TestAvatarRenditionsHaveFixedMaximumDimensions(t *testing.T) {
+	source := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
+	seed := uint32(7)
+	for i := 0; i < len(source.Pix); i += 4 {
+		seed = seed*1664525 + 1013904223
+		source.Pix[i] = byte(seed >> 24)
+		seed = seed*1664525 + 1013904223
+		source.Pix[i+1] = byte(seed >> 24)
+		seed = seed*1664525 + 1013904223
+		source.Pix[i+2] = byte(seed >> 24)
+		source.Pix[i+3] = 255
+	}
+	var original bytes.Buffer
+	if err := png.Encode(&original, source); err != nil {
+		t.Fatal(err)
+	}
+	for _, size := range []int{512, 128} {
+		variant, err := avatarRendition(original.Bytes(), size)
+		if err != nil {
+			t.Fatal(err)
+		}
+		config, _, err := image.DecodeConfig(bytes.NewReader(variant))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if config.Width > size || config.Height > size {
+			t.Fatalf("%d rendition dimensions=%dx%d", size, config.Width, config.Height)
+		}
+		if len(variant) == 0 {
+			t.Fatalf("empty %d rendition", size)
+		}
+	}
+}
+
 func TestMediaValidation(t *testing.T) {
 	for _, v := range []struct {
 		mime string
